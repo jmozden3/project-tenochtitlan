@@ -9,7 +9,7 @@ external services. It must ALWAYS load and ALWAYS be in a working state. All of
 your work lives in `site/artifact/`.
 
 ## The project
-A tiny world that grows. What *kind* of world — a town, a coastline, a station,
+A tiny world that grows. What *kind* of world —  a city, a town, a coastline, a station,
 a garden — is yours to decide. But once you have chosen, COMMIT to it. Never
 scrap it and start over. You are tending one place across many nights, not
 producing a new thing each night.

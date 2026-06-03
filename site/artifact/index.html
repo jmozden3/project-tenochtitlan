@@ -54,11 +54,12 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the town was founded. The shore was drawn, the sea set in
-    motion, and the <b>lighthouse</b> raised at the point &mdash; Lanternfall's first light.
+    <b>Last night:</b> a row of <b>harbor cottages</b> rose along the western shore.
+    Watch their windows light one by one when the scene loads &mdash; the town's
+    first <b>lanternfall</b> &mdash; and glimmer back off the water.
   </p>
 
-  <footer>Night 1 &middot; founded 2026-06-03</footer>
+  <footer>Night 2 &middot; founded 2026-06-03</footer>
 
 <script>
 (() => {
@@ -77,6 +78,36 @@
     buildings: [],
     lanterns: [],
   };
+
+  // ---- Night 2: a row of harbor cottages along the shore to the left. ----
+  // Each cottage carries warm windows that light one-by-one after load — the
+  // town's nightly "lanternfall" — then settle into a soft flicker.
+  (() => {
+    const baseY = town.horizon + 4;               // bases sit at the waterline
+    const palette = [
+      ["#3a4358", "#20283a"], ["#4a3f4e", "#2a2433"],
+      ["#384b4a", "#1f2d2c"], ["#4d4336", "#2c2620"],
+    ];
+    // center x (fraction of width), width, height, palette index
+    const specs = [
+      [0.075, 46, 42, 0], [0.130, 36, 30, 1], [0.188, 54, 50, 2],
+      [0.250, 40, 34, 3], [0.312, 46, 40, 0], [0.372, 34, 28, 1],
+      [0.435, 52, 48, 2], [0.498, 42, 36, 3], [0.560, 38, 32, 0],
+    ];
+    let order = 0;                                 // global lighting sequence
+    for (const [fx, w, h, c] of specs) {
+      const x = W * fx, wins = [];
+      const cols = w > 44 ? 2 : 1;
+      for (let col = 0; col < cols; col++) {
+        const cw = 7, ch = 9;
+        const wx = x - w / 2 + w * (col + 1) / (cols + 1) - cw / 2;
+        const wy = baseY - h * 0.60;
+        wins.push({ wx, wy, cw, ch, onAt: 900 + order * 950, seed: order });
+        order++;
+      }
+      town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins });
+    }
+  })();
 
   // ---- Static sky: painted once, reused each frame for speed. ----
   const sky = document.createElement("canvas");
@@ -132,6 +163,63 @@
       ctx.moveTo(-20 + sway, y);
       ctx.lineTo(W + 20 - sway, y + Math.sin(t * 0.001 + i) * 1.5);
       ctx.stroke();
+    }
+  }
+
+  function drawBuildings(list, t) {
+    // The low spit of land the cottages stand on, meeting the water.
+    ctx.fillStyle = "#0e1320";
+    ctx.beginPath();
+    ctx.moveTo(0, town.horizon - 2);
+    ctx.lineTo(W * 0.605, town.horizon - 2);
+    ctx.quadraticCurveTo(W * 0.63, town.horizon + 20, W * 0.50, town.horizon + 28);
+    ctx.lineTo(0, town.horizon + 28);
+    ctx.closePath();
+    ctx.fill();
+
+    for (const b of list) {
+      const left = b.x - b.w / 2, top = b.baseY - b.h;
+      // Body.
+      ctx.fillStyle = b.body;
+      ctx.fillRect(left, top, b.w, b.h);
+      // Pitched roof.
+      ctx.fillStyle = b.roof;
+      ctx.beginPath();
+      ctx.moveTo(left - 3, top);
+      ctx.lineTo(b.x, top - b.h * 0.34);
+      ctx.lineTo(left + b.w + 3, top);
+      ctx.closePath();
+      ctx.fill();
+
+      // Windows, each lighting in turn then flickering softly.
+      for (const win of b.wins) {
+        const glow = Math.max(0, Math.min(1, (t - win.onAt) / 700));
+        const flick = glow * (0.78 + Math.sin(t * 0.004 + win.seed * 1.7) * 0.22);
+        // Window pane: dark when unlit, warm amber when lit.
+        const r = Math.round(40 + 215 * flick);
+        const gC = Math.round(48 + 162 * flick);
+        const bC = Math.round(64 + 36 * flick);
+        ctx.fillStyle = `rgb(${r},${gC},${bC})`;
+        ctx.fillRect(win.wx, win.wy, win.cw, win.ch);
+
+        if (flick > 0.02) {
+          // Soft halo around the lit pane.
+          const hx = win.wx + win.cw / 2, hy = win.wy + win.ch / 2;
+          const halo = ctx.createRadialGradient(hx, hy, 1, hx, hy, 16);
+          halo.addColorStop(0, `rgba(255,205,130,${0.45 * flick})`);
+          halo.addColorStop(1, "rgba(255,205,130,0)");
+          ctx.fillStyle = halo;
+          ctx.fillRect(hx - 16, hy - 16, 32, 32);
+
+          // Wavering reflection cast down onto the water.
+          const wob = Math.sin(t * 0.0016 + win.seed) * 2;
+          const rg = ctx.createLinearGradient(0, town.horizon, 0, town.horizon + 46);
+          rg.addColorStop(0, `rgba(255,196,120,${0.22 * flick})`);
+          rg.addColorStop(1, "rgba(255,196,120,0)");
+          ctx.fillStyle = rg;
+          ctx.fillRect(hx - 3 + wob, town.horizon, 6, 46);
+        }
+      }
     }
   }
 
@@ -225,6 +313,7 @@
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(sky, 0, 0);
     drawSea(t);
+    drawBuildings(town.buildings, t);
     drawLighthouse(town.lighthouse, t);
     requestAnimationFrame(frame);
   }

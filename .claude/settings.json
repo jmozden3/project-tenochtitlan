@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Edit(site/artifact/**)",
+      "Write(site/artifact/**)",
+      "Edit(site/log/JOURNAL.md)",
+      "Edit(STATE.md)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(sudo:*)",
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Edit(CONSTITUTION.md)",
+      "Write(CONSTITUTION.md)",
+      "Edit(nightly.sh)",
+      "Write(nightly.sh)",
+      "Edit(Dockerfile)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Edit(site/index.html)",
+      "Write(site/index.html)"
+    ]
+  },
+  "includeCoAuthoredBy": false
+}

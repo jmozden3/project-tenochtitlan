@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Nightly Builder</title>
+<title>Lanternfall</title>
 <style>
   :root { --bg:#0e0f13; --panel:#16181f; --ink:#e8e9ee; --muted:#8a8f9c; --line:#262a33; --accent:#7aa2ff; }
   * { box-sizing: border-box; }
@@ -18,18 +18,23 @@
                border:1px solid var(--line); color:var(--muted); cursor:pointer;
                border-radius:20px; padding:5px 14px; font-size:13px; }
   .about-btn:hover { color:var(--ink); border-color:var(--accent); }
-  main { display:grid; grid-template-columns: 1fr 360px; gap:0; height:calc(100vh - 59px); }
+  main { display:grid; grid-template-columns: 1fr 380px; gap:0; height:calc(100vh - 59px); }
   .stage { border-right:1px solid var(--line); }
   .stage iframe { width:100%; height:100%; border:0; background:#fff; }
   aside { background:var(--panel); overflow-y:auto; padding:20px 22px; }
   aside h2 { font-size:13px; text-transform:uppercase; letter-spacing:1px;
              color:var(--muted); margin:0 0 14px; }
-  .diary h2 { font-size:16px; color:var(--ink); text-transform:none; letter-spacing:0; margin:22px 0 6px; }
-  .diary h1 { font-size:18px; }
+  .intro { color:var(--muted); font-size:13px; margin-bottom:14px; padding-bottom:14px;
+           border-bottom:1px solid var(--line); }
+  .diary details { border-bottom:1px solid var(--line); }
+  .diary summary { cursor:pointer; font-weight:600; color:var(--ink); list-style:none;
+                   padding:12px 0; font-size:15px; }
+  .diary summary::-webkit-details-marker { display:none; }
+  .diary summary:hover, .diary details[open] summary { color:var(--accent); }
+  .diary .body { padding-bottom:8px; }
   .diary p { color:#cfd2db; }
-  .diary em { color:var(--muted); }
+  .diary code { background:#0e0f13; padding:1px 5px; border-radius:4px; font-size:12.5px; }
   .diary a, .modal a { color:var(--accent); }
-  /* About overlay */
   .overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
              align-items:center; justify-content:center; padding:24px; z-index:10; }
   .overlay.open { display:flex; }
@@ -89,32 +94,36 @@
   const diary = document.getElementById('diary');
   try {
     const md = await (await fetch('log/JOURNAL.md?' + Date.now())).text();
-    const m = md.match(/##\s*Night\s*(\d+)\s*—\s*([^\n]+)/i);
-    if (m) {
-      document.getElementById('night').textContent = 'Night ' + m[1];
-      document.getElementById('latest').textContent = 'latest entry: ' + m[2].trim();
+
+    const all = [...md.matchAll(/##\s*Night\s*(\d+)\s*—\s*([^\n]+)/gi)];
+    if (all.length) {
+      const latest = all.reduce((a, b) => (+b[1] > +a[1] ? b : a));
+      document.getElementById('night').textContent = 'Night ' + latest[1];
+      document.getElementById('latest').textContent = 'latest entry: ' + latest[2].trim();
     }
-    diary.innerHTML = window.marked ? marked.parse(md)
-                                    : '<pre>' + md.replace(/[<>]/g,'') + '</pre>';
-  } catch (e) { diary.textContent = 'The diary will appear after the first nightly run.'; }
+
+    const parts = md.split(/(?=^##\s*Night\s)/m);
+    const intro = parts[0].replace(/^#\s*Build Log\s*/i, '').trim();
+    const entries = parts.slice(1).map(e => {
+      const m = e.match(/##\s*Night\s*(\d+)\s*—\s*([^\n]+)/i);
+      return {
+        n: m ? +m[1] : 0,
+        head: m ? ('Night ' + m[1] + ' — ' + m[2].trim()) : 'Night',
+        body: e.replace(/##\s*Night[^\n]*\n?/i, '')
+      };
+    }).sort((a, b) => b.n - a.n);
+
+    let html = intro ? '<div class="intro">' + marked.parse(intro) + '</div>' : '';
+    entries.forEach((p, i) => {
+      html += '<details' + (i === 0 ? ' open' : '') + '><summary>' + p.head +
+              '</summary><div class="body">' + marked.parse(p.body) + '</div></details>';
+    });
+    diary.innerHTML = html || 'The diary will appear after the first nightly run.';
+  } catch (e) {
+    diary.textContent = 'The diary will appear after the first nightly run.';
+  }
 })();
 
-// About overlay
-const overlay = document.getElementById('overlay');
-document.getElementById('aboutBtn').onclick = async () => {
-  overlay.classList.add('open');
-  try {
-    const txt = await (await fetch('constitution.md?' + Date.now())).text();
-    document.getElementById('rules').textContent = txt;
-  } catch (e) {
-    document.getElementById('rules').textContent =
-      'See the full rules in the linked repository.';
-  }
-};
-document.getElementById('closeBtn').onclick = () => overlay.classList.remove('open');
-overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('open'); };
-
-// Show the world's name (the artifact's <title>) in the header once it loads.
 const art = document.getElementById('art');
 art.addEventListener('load', () => {
   try {
@@ -125,6 +134,19 @@ art.addEventListener('load', () => {
     }
   } catch (e) {}
 });
+
+const overlay = document.getElementById('overlay');
+document.getElementById('aboutBtn').onclick = async () => {
+  overlay.classList.add('open');
+  try {
+    const txt = await (await fetch('constitution.md?' + Date.now())).text();
+    document.getElementById('rules').textContent = txt;
+  } catch (e) {
+    document.getElementById('rules').textContent = 'See the full rules in the linked repository.';
+  }
+};
+document.getElementById('closeBtn').onclick = () => overlay.classList.remove('open');
+overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('open'); };
 </script>
 </body>
 </html>

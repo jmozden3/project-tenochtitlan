@@ -3,20 +3,233 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Nightly Builder</title>
+<title>Lanternfall</title>
 <style>
-  html,body{height:100%;margin:0}
-  body{display:grid;place-items:center;background:#fafafa;color:#444;
-       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center}
-  div{max-width:420px;padding:24px}
-  h1{font-size:20px;color:#222}
+  :root{
+    --ink:#e8eef6;
+    --dim:#8fa3bd;
+  }
+  html,body{height:100%;margin:0;background:#0a0e1a;}
+  body{
+    display:flex;flex-direction:column;align-items:center;
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--ink);overflow-x:hidden;
+  }
+  header{
+    text-align:center;padding:22px 16px 6px;
+  }
+  header h1{
+    margin:0;font-size:30px;font-weight:600;letter-spacing:.06em;
+    color:#fff;text-shadow:0 0 18px rgba(255,196,120,.35);
+  }
+  header .tag{margin:4px 0 0;color:var(--dim);font-size:13px;letter-spacing:.04em;}
+  #stage{
+    position:relative;width:100%;max-width:900px;margin-top:10px;
+    aspect-ratio:16/9;
+  }
+  canvas{
+    display:block;width:100%;height:100%;
+    border-radius:10px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55);
+  }
+  .delta{
+    margin:14px 16px 4px;max-width:680px;text-align:center;
+    color:var(--dim);font-size:13px;
+  }
+  .delta b{color:#ffd9a0;font-weight:600;}
+  footer{
+    margin:10px 0 26px;color:#54627a;font-size:12px;text-align:center;
+  }
+  a{color:#9bb6da;}
 </style>
 </head>
 <body>
-  <div>
-    <h1>The world hasn't been built yet.</h1>
-    <p>An autonomous builder will lay the first foundation on its first night.
-       Check back tomorrow morning.</p>
+  <header>
+    <h1>Lanternfall</h1>
+    <p class="tag">a small harbor town that grows, one night at a time</p>
+  </header>
+
+  <div id="stage">
+    <canvas id="scene" width="1280" height="720" aria-label="A dusk harbor scene with a lighthouse"></canvas>
   </div>
+
+  <p class="delta" id="delta">
+    <b>Last night:</b> the town was founded. The shore was drawn, the sea set in
+    motion, and the <b>lighthouse</b> raised at the point &mdash; Lanternfall's first light.
+  </p>
+
+  <footer>Night 1 &middot; founded 2026-06-03</footer>
+
+<script>
+(() => {
+  "use strict";
+  const canvas = document.getElementById("scene");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  // ---- The world. Future nights grow these collections. ----
+  const town = {
+    name: "Lanternfall",
+    horizon: H * 0.52,        // where sea meets sky
+    // The lighthouse sits on a rocky point to the right.
+    lighthouse: { x: W * 0.80, baseY: H * 0.58, height: 150, width: 34 },
+    // Buildings, lanterns, boats accumulate here over future nights.
+    buildings: [],
+    lanterns: [],
+  };
+
+  // ---- Static sky: painted once, reused each frame for speed. ----
+  const sky = document.createElement("canvas");
+  sky.width = W; sky.height = H;
+  (() => {
+    const s = sky.getContext("2d");
+    const g = s.createLinearGradient(0, 0, 0, town.horizon);
+    g.addColorStop(0.00, "#0c1430");
+    g.addColorStop(0.45, "#243a63");
+    g.addColorStop(0.78, "#5b5a86");
+    g.addColorStop(1.00, "#c9826b");   // warm dusk band on the horizon
+    s.fillStyle = g;
+    s.fillRect(0, 0, W, town.horizon);
+
+    // A scatter of early stars in the upper sky.
+    s.fillStyle = "#ffffff";
+    for (let i = 0; i < 70; i++) {
+      const sx = (i * 8627.13) % W;
+      const sy = (i * 4391.77) % (town.horizon * 0.6);
+      const a = 0.15 + ((i * 53) % 60) / 100 * 0.6;
+      s.globalAlpha = a;
+      s.fillRect(sx, sy, sy < 40 ? 2 : 1, sy < 40 ? 2 : 1);
+    }
+    s.globalAlpha = 1;
+
+    // Distant headland on the left, hazy.
+    s.fillStyle = "#2a2f4a";
+    s.beginPath();
+    s.moveTo(0, town.horizon);
+    s.lineTo(0, town.horizon - 70);
+    s.quadraticCurveTo(W * 0.10, town.horizon - 96, W * 0.22, town.horizon - 30);
+    s.lineTo(W * 0.30, town.horizon);
+    s.closePath();
+    s.fill();
+  })();
+
+  // ---- Drawing helpers ----
+  function drawSea(t) {
+    const sea = ctx.createLinearGradient(0, town.horizon, 0, H);
+    sea.addColorStop(0, "#16243f");
+    sea.addColorStop(1, "#070d1c");
+    ctx.fillStyle = sea;
+    ctx.fillRect(0, town.horizon, W, H - town.horizon);
+
+    // Shimmering horizontal wave lines, gently animated.
+    for (let i = 0; i < 26; i++) {
+      const p = i / 26;
+      const y = town.horizon + p * p * (H - town.horizon);
+      const sway = Math.sin(t * 0.0011 + i * 0.9) * (4 + p * 22);
+      ctx.strokeStyle = `rgba(150,180,220,${0.04 + p * 0.07})`;
+      ctx.lineWidth = 1 + p * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-20 + sway, y);
+      ctx.lineTo(W + 20 - sway, y + Math.sin(t * 0.001 + i) * 1.5);
+      ctx.stroke();
+    }
+  }
+
+  function drawLighthouse(lh, t) {
+    const { x, baseY, height, width } = lh;
+    const topY = baseY - height;
+
+    // Rocky point it stands on.
+    ctx.fillStyle = "#10141f";
+    ctx.beginPath();
+    ctx.moveTo(x - 90, baseY + 36);
+    ctx.quadraticCurveTo(x, baseY - 6, x + 95, baseY + 40);
+    ctx.lineTo(x + 95, H);
+    ctx.lineTo(x - 90, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tower body, slightly tapered, with candy stripes.
+    const halfB = width / 2, halfT = width * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(x - halfB, baseY);
+    ctx.lineTo(x - halfT, topY);
+    ctx.lineTo(x + halfT, topY);
+    ctx.lineTo(x + halfB, baseY);
+    ctx.closePath();
+    ctx.fillStyle = "#e9e4da";
+    ctx.fill();
+
+    // Red stripes.
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = "#c0473b";
+    const bands = 4;
+    for (let i = 0; i < bands; i++) {
+      const y0 = topY + (height) * (i * 2 + 0.5) / (bands * 2);
+      ctx.fillRect(x - halfB, y0, width, height / (bands * 2));
+    }
+    ctx.restore();
+
+    // Lantern room (the glassed top) and cap.
+    const roomY = topY - 22;
+    ctx.fillStyle = "#2b3242";
+    ctx.fillRect(x - halfT - 4, roomY, halfT * 2 + 8, 22);
+    // Glowing lamp inside, with a soft pulse.
+    const pulse = 0.6 + Math.sin(t * 0.002) * 0.18;
+    const lamp = ctx.createRadialGradient(x, roomY + 11, 1, x, roomY + 11, 26);
+    lamp.addColorStop(0, `rgba(255,238,180,${0.95 * pulse})`);
+    lamp.addColorStop(1, "rgba(255,238,180,0)");
+    ctx.fillStyle = lamp;
+    ctx.fillRect(x - 30, roomY - 18, 60, 56);
+    // Cap.
+    ctx.fillStyle = "#1a1f2b";
+    ctx.beginPath();
+    ctx.moveTo(x - halfT - 6, roomY);
+    ctx.lineTo(x, roomY - 16);
+    ctx.lineTo(x + halfT + 6, roomY);
+    ctx.closePath();
+    ctx.fill();
+
+    // The sweeping beam — a slow rotating wedge of light.
+    const beamAng = t * 0.0006;
+    const dir = Math.sin(beamAng);          // -1..1 sweep
+    const cx = x, cy = roomY + 11;
+    const reach = 520;
+    const spread = 0.12;
+    const aim = -0.15 + dir * 0.9;           // mostly across the water
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const beam = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
+    beam.addColorStop(0, "rgba(255,240,190,0.30)");
+    beam.addColorStop(1, "rgba(255,240,190,0)");
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(aim - spread) * reach, cy + Math.sin(aim - spread) * reach);
+    ctx.lineTo(cx + Math.cos(aim + spread) * reach, cy + Math.sin(aim + spread) * reach);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Warm glow reflected on the water beneath the point.
+    const refl = ctx.createRadialGradient(x, baseY + 30, 4, x, baseY + 30, 130);
+    refl.addColorStop(0, `rgba(255,210,140,${0.10 * pulse})`);
+    refl.addColorStop(1, "rgba(255,210,140,0)");
+    ctx.fillStyle = refl;
+    ctx.fillRect(x - 130, baseY, 260, 150);
+  }
+
+  // ---- Main loop ----
+  function frame(t) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(sky, 0, 0);
+    drawSea(t);
+    drawLighthouse(town.lighthouse, t);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>

@@ -54,12 +54,12 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> a row of <b>harbor cottages</b> rose along the western shore.
-    Watch their windows light one by one when the scene loads &mdash; the town's
-    first <b>lanternfall</b> &mdash; and glimmer back off the water.
+    <b>Last night:</b> the first <b>moving</b> thing arrived &mdash; a small
+    <b>fishing boat</b> now drifts slowly across the open water, a warm lantern
+    swinging at its bow and trailing a wavering reflection. Watch it cross.
   </p>
 
-  <footer>Night 2 &middot; founded 2026-06-02</footer>
+  <footer>Night 3 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -77,7 +77,19 @@
     // Buildings, lanterns, boats accumulate here over future nights.
     buildings: [],
     lanterns: [],
+    boats: [],
   };
+
+  // ---- Night 3: the first MOVING thing — a small fishing boat that drifts
+  // in from the headland (left) across the open water toward the cottages,
+  // a warm lantern swinging at its bow. It loops slowly, forever crossing. ----
+  town.boats.push({
+    baseY: town.horizon + 84,   // rides the open water below the cottages
+    scale: 1.7,
+    speed: 0.028,               // px/ms — a slow drift; ~50s to cross
+    offset: 240,                // starting position along the loop
+    phase: 1.3,                 // its own bob/sway timing
+  });
 
   // ---- Night 2: a row of harbor cottages along the shore to the left. ----
   // Each cottage carries warm windows that light one-by-one after load — the
@@ -223,6 +235,90 @@
     }
   }
 
+  function drawBoats(list, t) {
+    for (const bt of list) {
+      const range = W + 160;
+      // Wrap across the scene: enters at the left, exits past the right.
+      const x = -80 + (((t * bt.speed) + bt.offset) % range);
+      const bob = Math.sin(t * 0.0013 + bt.phase) * 4;     // gentle rise/fall
+      const y = bt.baseY + bob;
+      const tilt = Math.sin(t * 0.0011 + bt.phase) * 0.04;  // rocks on the swell
+      const s = bt.scale;
+
+      // Lantern reflection cast straight down onto the water (world coords, so
+      // it stays vertical no matter how the hull rocks).
+      const lx = x + 24 * s;
+      const lwob = Math.sin(t * 0.0017 + bt.phase) * 2.6;
+      const rg = ctx.createLinearGradient(0, y, 0, y + 74);
+      rg.addColorStop(0, "rgba(255,198,118,0.42)");
+      rg.addColorStop(1, "rgba(255,198,118,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(lx - 4 + lwob, y, 8, 74);
+
+      // Faint wake trailing behind the bow.
+      ctx.strokeStyle = "rgba(170,195,225,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 24 * s, y + 4);
+      ctx.lineTo(x - 70 * s, y + 16);
+      ctx.moveTo(x - 24 * s, y + 4);
+      ctx.lineTo(x - 70 * s, y - 6);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(tilt);
+      ctx.scale(s, s);
+
+      // Hull — a shallow wooden crescent.
+      ctx.fillStyle = "#1d1712";
+      ctx.beginPath();
+      ctx.moveTo(-26, 0);
+      ctx.quadraticCurveTo(-20, 10, 0, 11);
+      ctx.quadraticCurveTo(22, 10, 29, 0);
+      ctx.quadraticCurveTo(6, 4, -26, 0);
+      ctx.closePath();
+      ctx.fill();
+      // A plank highlight along the gunwale.
+      ctx.strokeStyle = "#3c2d22";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-24, 0.5);
+      ctx.quadraticCurveTo(4, 4, 27, 0.5);
+      ctx.stroke();
+
+      // Little wheelhouse / cabin toward the stern.
+      ctx.fillStyle = "#2a2018";
+      ctx.fillRect(-13, -11, 15, 11);
+      // Warm cabin window.
+      const cab = 0.55 + Math.sin(t * 0.005 + bt.phase) * 0.12;
+      ctx.fillStyle = `rgba(255,206,138,${cab})`;
+      ctx.fillRect(-9, -8, 5, 5);
+
+      // Mast and the lantern pole at the bow.
+      ctx.strokeStyle = "#231a14";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(2, -11); ctx.lineTo(2, -26);
+      ctx.moveTo(24, 0); ctx.lineTo(24, -13);
+      ctx.stroke();
+
+      // The bow lantern — Lanternfall, afloat. Soft amber halo + bright core.
+      const pulse = 0.82 + Math.sin(t * 0.006 + bt.phase) * 0.18;
+      const lg = ctx.createRadialGradient(24, -13, 0, 24, -13, 15);
+      lg.addColorStop(0, `rgba(255,212,132,${0.95 * pulse})`);
+      lg.addColorStop(1, "rgba(255,212,132,0)");
+      ctx.fillStyle = lg;
+      ctx.fillRect(24 - 15, -13 - 15, 30, 30);
+      ctx.fillStyle = "#ffe9b8";
+      ctx.beginPath();
+      ctx.arc(24, -13, 2.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
   function drawLighthouse(lh, t) {
     const { x, baseY, height, width } = lh;
     const topY = baseY - height;
@@ -314,6 +410,7 @@
     ctx.drawImage(sky, 0, 0);
     drawSea(t);
     drawBuildings(town.buildings, t);
+    drawBoats(town.boats, t);
     drawLighthouse(town.lighthouse, t);
     requestAnimationFrame(frame);
   }

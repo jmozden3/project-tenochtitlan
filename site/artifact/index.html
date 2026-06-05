@@ -54,12 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the first <b>moving</b> thing arrived &mdash; a small
-    <b>fishing boat</b> now drifts slowly across the open water, a warm lantern
-    swinging at its bow and trailing a wavering reflection. Watch it cross.
+    <b>Last night:</b> time itself began to move &mdash; a full <b>day&ndash;night
+    cycle</b> now turns over Lanternfall. A <b>sun and moon</b> arc overhead, the
+    sky reddens and dims, stars fade up, and the cottage windows light one&#8209;by&#8209;one
+    at <b>every dusk</b>. The page opens in late afternoon &mdash; stay and watch
+    dusk fall, the lanterns light, full dark, then dawn.
   </p>
 
-  <footer>Night 3 &middot; founded 2026-06-02</footer>
+  <footer>Night 4 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -114,53 +116,145 @@
         const cw = 7, ch = 9;
         const wx = x - w / 2 + w * (col + 1) / (cols + 1) - cw / 2;
         const wy = baseY - h * 0.60;
-        wins.push({ wx, wy, cw, ch, onAt: 900 + order * 950, seed: order });
+        // Each window lights as night deepens past its own threshold, so the
+        // row comes alight in sequence at *every* dusk (and goes out at dawn).
+        wins.push({ wx, wy, cw, ch, thresh: 0.30 + order * 0.045, seed: order });
         order++;
       }
       town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins });
     }
   })();
 
-  // ---- Static sky: painted once, reused each frame for speed. ----
-  const sky = document.createElement("canvas");
-  sky.width = W; sky.height = H;
-  (() => {
-    const s = sky.getContext("2d");
-    const g = s.createLinearGradient(0, 0, 0, town.horizon);
-    g.addColorStop(0.00, "#0c1430");
-    g.addColorStop(0.45, "#243a63");
-    g.addColorStop(0.78, "#5b5a86");
-    g.addColorStop(1.00, "#c9826b");   // warm dusk band on the horizon
-    s.fillStyle = g;
-    s.fillRect(0, 0, W, town.horizon);
+  // ---- Night 4: a master DAY–NIGHT CLOCK. Everything in town now breathes
+  // with it — the sky reddens and dims, a sun/moon arcs overhead, the stars
+  // fade up, and the windows light one-by-one at *every* dusk, not just on load.
+  const DAY_MS = 120000;                 // one full day→night→day cycle (2 min)
+  const START  = 0.70 * DAY_MS;          // open in late afternoon, so the visitor
+                                         // catches dusk fall + the lanternfall live
 
-    // A scatter of early stars in the upper sky.
-    s.fillStyle = "#ffffff";
-    for (let i = 0; i < 70; i++) {
-      const sx = (i * 8627.13) % W;
-      const sy = (i * 4391.77) % (town.horizon * 0.6);
-      const a = 0.15 + ((i * 53) % 60) / 100 * 0.6;
-      s.globalAlpha = a;
-      s.fillRect(sx, sy, sy < 40 ? 2 : 1, sy < 40 ? 2 : 1);
+  // Small math helpers.
+  const ss   = (e0, e1, x) => { const k = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const lerpC = (c1, c2, k) => [lerp(c1[0],c2[0],k), lerp(c1[1],c2[1],k), lerp(c1[2],c2[2],k)];
+  const rgb  = c => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+
+  // Sky/sea keyframe colors [r,g,b], blended by the clock each frame.
+  const SKY_NIGHT = [[10,16,36],[21,38,74],[42,47,85],[58,51,80]];
+  const SKY_DAY   = [[74,116,168],[125,158,196],[174,188,207],[205,210,208]];
+  const DUSK_WARM = [226,138,92];        // warm band pulled in near rise/set
+  const SEA_NIGHT = [[22,36,63],[7,13,28]];
+  const SEA_DAY   = [[58,100,140],[18,46,74]];
+
+  // Deterministic early stars (positions baked once; brightness rides the clock).
+  const stars = [];
+  for (let i = 0; i < 70; i++) {
+    stars.push({
+      x: (i * 8627.13) % W,
+      y: (i * 4391.77) % (town.horizon * 0.6),
+      a: 0.15 + ((i * 53) % 60) / 100 * 0.6,
+      s: ((i * 4391.77) % (town.horizon * 0.6)) < 40 ? 2 : 1,
+    });
+  }
+
+  // Read the clock: where we are in the day and what that means for light.
+  function clock(t) {
+    const cycle = ((t + START) % DAY_MS) / DAY_MS;     // 0=midnight, .5=noon
+    const elev = -Math.cos(cycle * Math.PI * 2);       // -1 night .. +1 noon
+    const daylight = ss(-0.15, 0.35, elev);            // 0 dark .. 1 bright
+    const nightness = 1 - daylight;
+    const dusk = Math.max(0, 1 - Math.abs(elev) * 2.2);// warm glow near horizon
+    let phase = "night";
+    if      (cycle >= 0.22 && cycle < 0.30) phase = "dawn";
+    else if (cycle >= 0.30 && cycle < 0.45) phase = "morning";
+    else if (cycle >= 0.45 && cycle < 0.55) phase = "midday";
+    else if (cycle >= 0.55 && cycle < 0.70) phase = "afternoon";
+    else if (cycle >= 0.70 && cycle < 0.80) phase = "dusk";
+    return { cycle, elev, daylight, nightness, dusk, phase };
+  }
+
+  // The sky: a gradient blended between night and day, warmed at the horizon
+  // toward dusk, with fading stars, an arcing sun/moon, and the hazy headland.
+  function drawSky(c) {
+    const cols = SKY_NIGHT.map((nc, i) => lerpC(nc, SKY_DAY[i], c.daylight));
+    const horizonCol = lerpC(cols[3], DUSK_WARM, c.dusk * 0.85);
+    const lowMid = lerpC(cols[2], DUSK_WARM, c.dusk * 0.35);
+    const g = ctx.createLinearGradient(0, 0, 0, town.horizon);
+    g.addColorStop(0.00, rgb(cols[0]));
+    g.addColorStop(0.45, rgb(cols[1]));
+    g.addColorStop(0.78, rgb(lowMid));
+    g.addColorStop(1.00, rgb(horizonCol));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, town.horizon);
+
+    // Stars fade in as night deepens.
+    if (c.nightness > 0.02) {
+      ctx.fillStyle = "#ffffff";
+      for (const st of stars) {
+        ctx.globalAlpha = st.a * c.nightness;
+        ctx.fillRect(st.x, st.y, st.s, st.s);
+      }
+      ctx.globalAlpha = 1;
     }
-    s.globalAlpha = 1;
+
+    drawCelestial(c);
 
     // Distant headland on the left, hazy.
-    s.fillStyle = "#2a2f4a";
-    s.beginPath();
-    s.moveTo(0, town.horizon);
-    s.lineTo(0, town.horizon - 70);
-    s.quadraticCurveTo(W * 0.10, town.horizon - 96, W * 0.22, town.horizon - 30);
-    s.lineTo(W * 0.30, town.horizon);
-    s.closePath();
-    s.fill();
-  })();
+    ctx.fillStyle = rgb(lerpC([32,37,58], [74,84,108], c.daylight));
+    ctx.beginPath();
+    ctx.moveTo(0, town.horizon);
+    ctx.lineTo(0, town.horizon - 70);
+    ctx.quadraticCurveTo(W * 0.10, town.horizon - 96, W * 0.22, town.horizon - 30);
+    ctx.lineTo(W * 0.30, town.horizon);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // A single light in the sky: the sun during the day half of the cycle, the
+  // moon during the night half. Each arcs left→right and casts a glimmer.
+  function drawCelestial(c) {
+    const day = c.cycle >= 0.25 && c.cycle < 0.75;
+    const u = day ? (c.cycle - 0.25) / 0.5
+                  : (c.cycle >= 0.75 ? (c.cycle - 0.75) / 0.5 : (c.cycle + 0.25) / 0.5);
+    const x = W * (0.12 + 0.76 * u);
+    const y = town.horizon - Math.sin(u * Math.PI) * (town.horizon * 0.66);
+
+    if (day) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, 95);
+      glow.addColorStop(0, "rgba(255,236,180,0.85)");
+      glow.addColorStop(1, "rgba(255,236,180,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 95, y - 95, 190, 190);
+      ctx.fillStyle = "#fff3d4";
+      ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.fill();
+    } else {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, 64);
+      glow.addColorStop(0, "rgba(214,226,245,0.55)");
+      glow.addColorStop(1, "rgba(214,226,245,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 64, y - 64, 128, 128);
+      ctx.fillStyle = "#eef2fb";
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(176,191,222,0.55)";   // a hint of a crater
+      ctx.beginPath(); ctx.arc(x + 4, y - 3, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Glimmer of the body straight down on the water.
+    const refC = day ? "255,230,170" : "200,215,240";
+    const refA = day ? 0.16 : 0.13 * c.nightness;
+    if (refA > 0.01) {
+      const rg = ctx.createLinearGradient(0, town.horizon, 0, town.horizon + 90);
+      rg.addColorStop(0, `rgba(${refC},${refA})`);
+      rg.addColorStop(1, `rgba(${refC},0)`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(x - 7, town.horizon, 14, 90);
+    }
+  }
 
   // ---- Drawing helpers ----
-  function drawSea(t) {
+  function drawSea(t, c) {
     const sea = ctx.createLinearGradient(0, town.horizon, 0, H);
-    sea.addColorStop(0, "#16243f");
-    sea.addColorStop(1, "#070d1c");
+    sea.addColorStop(0, rgb(lerpC(SEA_NIGHT[0], SEA_DAY[0], c.daylight)));
+    sea.addColorStop(1, rgb(lerpC(SEA_NIGHT[1], SEA_DAY[1], c.daylight)));
     ctx.fillStyle = sea;
     ctx.fillRect(0, town.horizon, W, H - town.horizon);
 
@@ -178,7 +272,7 @@
     }
   }
 
-  function drawBuildings(list, t) {
+  function drawBuildings(list, t, c) {
     // The low spit of land the cottages stand on, meeting the water.
     ctx.fillStyle = "#0e1320";
     ctx.beginPath();
@@ -205,7 +299,7 @@
 
       // Windows, each lighting in turn then flickering softly.
       for (const win of b.wins) {
-        const glow = Math.max(0, Math.min(1, (t - win.onAt) / 700));
+        const glow = ss(win.thresh - 0.06, win.thresh + 0.06, c.nightness);
         const flick = glow * (0.78 + Math.sin(t * 0.004 + win.seed * 1.7) * 0.22);
         // Window pane: dark when unlit, warm amber when lit.
         const r = Math.round(40 + 215 * flick);
@@ -235,7 +329,9 @@
     }
   }
 
-  function drawBoats(list, t) {
+  function drawBoats(list, t, c) {
+    const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
+    const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
     for (const bt of list) {
       const range = W + 160;
       // Wrap across the scene: enters at the left, exits past the right.
@@ -250,7 +346,7 @@
       const lx = x + 24 * s;
       const lwob = Math.sin(t * 0.0017 + bt.phase) * 2.6;
       const rg = ctx.createLinearGradient(0, y, 0, y + 74);
-      rg.addColorStop(0, "rgba(255,198,118,0.42)");
+      rg.addColorStop(0, `rgba(255,198,118,${0.42 * wl})`);
       rg.addColorStop(1, "rgba(255,198,118,0)");
       ctx.fillStyle = rg;
       ctx.fillRect(lx - 4 + lwob, y, 8, 74);
@@ -306,7 +402,7 @@
       // The bow lantern — Lanternfall, afloat. Soft amber halo + bright core.
       const pulse = 0.82 + Math.sin(t * 0.006 + bt.phase) * 0.18;
       const lg = ctx.createRadialGradient(24, -13, 0, 24, -13, 15);
-      lg.addColorStop(0, `rgba(255,212,132,${0.95 * pulse})`);
+      lg.addColorStop(0, `rgba(255,212,132,${0.95 * pulse * nl})`);
       lg.addColorStop(1, "rgba(255,212,132,0)");
       ctx.fillStyle = lg;
       ctx.fillRect(24 - 15, -13 - 15, 30, 30);
@@ -319,7 +415,8 @@
     }
   }
 
-  function drawLighthouse(lh, t) {
+  function drawLighthouse(lh, t, c) {
+    const nl = 0.2 + 0.8 * c.nightness;   // the lamp matters most after dark
     const { x, baseY, height, width } = lh;
     const topY = baseY - height;
 
@@ -362,7 +459,7 @@
     // Glowing lamp inside, with a soft pulse.
     const pulse = 0.6 + Math.sin(t * 0.002) * 0.18;
     const lamp = ctx.createRadialGradient(x, roomY + 11, 1, x, roomY + 11, 26);
-    lamp.addColorStop(0, `rgba(255,238,180,${0.95 * pulse})`);
+    lamp.addColorStop(0, `rgba(255,238,180,${0.95 * pulse * nl})`);
     lamp.addColorStop(1, "rgba(255,238,180,0)");
     ctx.fillStyle = lamp;
     ctx.fillRect(x - 30, roomY - 18, 60, 56);
@@ -385,7 +482,7 @@
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const beam = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
-    beam.addColorStop(0, "rgba(255,240,190,0.30)");
+    beam.addColorStop(0, `rgba(255,240,190,${0.30 * (0.15 + 0.85 * c.nightness)})`);
     beam.addColorStop(1, "rgba(255,240,190,0)");
     ctx.fillStyle = beam;
     ctx.beginPath();
@@ -398,7 +495,7 @@
 
     // Warm glow reflected on the water beneath the point.
     const refl = ctx.createRadialGradient(x, baseY + 30, 4, x, baseY + 30, 130);
-    refl.addColorStop(0, `rgba(255,210,140,${0.10 * pulse})`);
+    refl.addColorStop(0, `rgba(255,210,140,${0.10 * pulse * nl})`);
     refl.addColorStop(1, "rgba(255,210,140,0)");
     ctx.fillStyle = refl;
     ctx.fillRect(x - 130, baseY, 260, 150);
@@ -406,12 +503,20 @@
 
   // ---- Main loop ----
   function frame(t) {
+    const c = clock(t);
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(sky, 0, 0);
-    drawSea(t);
-    drawBuildings(town.buildings, t);
-    drawBoats(town.boats, t);
-    drawLighthouse(town.lighthouse, t);
+    drawSky(c);
+    drawSea(t, c);
+    drawBuildings(town.buildings, t, c);
+    drawBoats(town.boats, t, c);
+    drawLighthouse(town.lighthouse, t, c);
+
+    // Quiet time-of-day readout, top-left — the clock made legible.
+    ctx.font = "600 26px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(232,238,246,0.45)";
+    ctx.fillText(c.phase, 26, 46);
+
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

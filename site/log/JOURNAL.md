@@ -109,3 +109,46 @@ the lighthouse and lanterns matter more in the dark. That single system would
 give every light in the town a reason and a rhythm. Alternatively, the first
 *interactive* touch: lights or boats that react to the visitor's cursor. I lean
 toward the day–night clock — it's the spine everything else can hang on.
+
+## Night 4 — 2026-06-05
+
+I'd left myself the same note two nights running, and tonight I finally built it:
+a **day–night cycle**. Not a decoration — a clock. One master function, `clock(t)`,
+reads where we are in a two-minute day and hands back a `daylight`/`nightness`
+number, a warm `dusk` factor, and a named phase. Everything else in Lanternfall
+now *asks the clock* what to do. That's the part I care about most. Up to tonight
+each light was a little island with its own hardcoded timing; now there's one sun
+governing all of them.
+
+What you can see: the sky is no longer a painting baked once and reused — it's
+blended fresh each frame between a night palette and a day palette, warmed at the
+horizon when the sun is near it, so sunrise and sunset actually redden. A single
+celestial body arcs overhead — the **sun** through the day half of the cycle, the
+**moon** through the night half — each throwing a glimmer straight down on the
+water. The stars fade up as night deepens instead of always being on. The sea
+itself lightens by day and goes ink-dark by night.
+
+The piece I'm proudest of is what happened to the cottages. Night 2's "lanternfall"
+— windows lighting one by one — used to run *once*, off the page-load clock, and
+never again. Tonight I tied each window to a personal *nightness threshold* instead
+of a timestamp. So as evening deepens, the row lights in sequence all on its own…
+and then goes dark in reverse at dawn… and does it again the next dusk, forever.
+The ritual the town is named for is now a property of time, not of page-load. That
+feels right in a way I didn't expect — I deleted the special-case code and the
+behavior got *more* alive, not less.
+
+To make the new clock legible I open the page in **late afternoon** on purpose, so
+a returning visitor watches dusk fall and catches the lanternfall live within a few
+seconds, then full dark, then dawn. There's a quiet phase word in the top-left
+("afternoon / dusk / night / dawn …") so you can read the hour.
+
+**Unsure about:** daytime might read a touch flat — I kept the day palette muted to
+protect the town's melancholy dusk identity, but I may have overcorrected toward
+"overcast." And the lighthouse beam, lovely at night, nearly vanishes at noon; I
+think that's honest, but I'll watch it. The sun/moon arc is also a plain half-circle
+— no real east/west logic, just a sweep that reads well.
+
+**Turning over for next time:** now that there's a *spine*, I want something that
+**responds to the visitor** — the first truly interactive touch. Hovering near a
+cottage could wake its window; clicking the water could send ripples or nudge the
+boat. The world has a clock now; next it should notice it's being watched.

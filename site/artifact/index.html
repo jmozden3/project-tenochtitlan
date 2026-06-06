@@ -54,14 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> time itself began to move &mdash; a full <b>day&ndash;night
-    cycle</b> now turns over Lanternfall. A <b>sun and moon</b> arc overhead, the
-    sky reddens and dims, stars fade up, and the cottage windows light one&#8209;by&#8209;one
-    at <b>every dusk</b>. The page opens in late afternoon &mdash; stay and watch
-    dusk fall, the lanterns light, full dark, then dawn.
+    <b>Last night:</b> Lanternfall noticed you. <b>Touch the water</b> &mdash; click
+    or drag the sea and it <b>ripples</b>, rings spreading and fading on the surface.
+    Your cursor now carries a faint <b>lantern&#8209;glow</b> that follows you and
+    reflects on the water. The world&rsquo;s first response to a visitor.
   </p>
 
-  <footer>Night 4 &middot; founded 2026-06-02</footer>
+  <footer>Night 5 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -124,6 +123,37 @@
       town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins });
     }
   })();
+
+  // ---- Night 5: the world notices it's being WATCHED. The pointer is now a
+  // presence in the scene — a faint carried lantern that glows where the visitor
+  // hovers (and reflects on the water), and the sea RIPPLES where they touch it.
+  // Click/drag the water to send expanding rings; they ride the surface and fade.
+  const ripples = [];                          // {x, y, t0, s}  s = strength
+  const pointer = { x: 0, y: 0, inside: false, lsx: -999, lsy: -999 };
+
+  // Map a pointer event into the canvas's fixed 1280×720 space (CSS scales it).
+  function toScene(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+  // Drop a ripple — but only where there's water to disturb.
+  function spawnRipple(x, y, s) {
+    if (y < town.horizon + 2) return;
+    if (ripples.length > 60) ripples.shift();
+    ripples.push({ x, y, t0: performance.now(), s });
+  }
+  canvas.addEventListener("pointerdown", e => { const p = toScene(e); spawnRipple(p.x, p.y, 1); });
+  canvas.addEventListener("pointerleave", () => { pointer.inside = false; });
+  canvas.addEventListener("pointermove", e => {
+    const p = toScene(e);
+    pointer.x = p.x; pointer.y = p.y; pointer.inside = true;
+    // Dragging/sweeping across the water leaves a faint wake of small ripples.
+    const dx = p.x - pointer.lsx, dy = p.y - pointer.lsy;
+    if (p.y > town.horizon && dx * dx + dy * dy > 1600) {
+      spawnRipple(p.x, p.y, 0.4);
+      pointer.lsx = p.x; pointer.lsy = p.y;
+    }
+  });
 
   // ---- Night 4: a master DAY–NIGHT CLOCK. Everything in town now breathes
   // with it — the sky reddens and dims, a sun/moon arcs overhead, the stars
@@ -501,15 +531,62 @@
     ctx.fillRect(x - 130, baseY, 260, 150);
   }
 
+  // The visitor's touch on the water: concentric rings that expand, flatten
+  // with the water's perspective (wider than tall), and fade out. Drawn straight
+  // onto the surface so everything afloat rides over them.
+  function drawRipples(t) {
+    const LIFE = 2600;
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const rp = ripples[i];
+      const age = t - rp.t0;
+      if (age > LIFE) { ripples.splice(i, 1); continue; }
+      const p = age / LIFE;                          // 0 fresh .. 1 spent
+      const depth = Math.min(1, Math.max(0, (rp.y - town.horizon) / (H - town.horizon)));
+      const maxR = lerp(34, 150, depth) * rp.s;      // nearer water = bigger rings
+      const rx = maxR * Math.sqrt(p);                // fast open, then ease out
+      const ry = rx * 0.30;                          // foreshortened on the water
+      const a = (1 - p) * 0.5 * rp.s;
+      ctx.strokeStyle = `rgba(202,224,246,${a})`;
+      ctx.lineWidth = 1.4 * (1 - p) + 0.5;
+      ctx.beginPath(); ctx.ellipse(rp.x, rp.y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+      const rx2 = rx * 0.55;                          // a trailing inner ring
+      if (rx2 > 1.5) {
+        ctx.strokeStyle = `rgba(202,224,246,${a * 0.6})`;
+        ctx.beginPath(); ctx.ellipse(rp.x, rp.y, rx2, rx2 * 0.30, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+  }
+
+  // The pointer as a carried light — a soft warm glow where the visitor hovers,
+  // laying a reflection on the water when held over the sea.
+  function drawPointer() {
+    if (!pointer.inside) return;
+    const warm = "255,210,140";
+    const glow = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 48);
+    glow.addColorStop(0, `rgba(${warm},0.16)`);
+    glow.addColorStop(1, `rgba(${warm},0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(pointer.x - 48, pointer.y - 48, 96, 96);
+    if (pointer.y > town.horizon) {
+      const rg = ctx.createLinearGradient(0, pointer.y, 0, pointer.y + 58);
+      rg.addColorStop(0, `rgba(${warm},0.12)`);
+      rg.addColorStop(1, `rgba(${warm},0)`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(pointer.x - 5, pointer.y, 10, 58);
+    }
+  }
+
   // ---- Main loop ----
   function frame(t) {
     const c = clock(t);
     ctx.clearRect(0, 0, W, H);
     drawSky(c);
     drawSea(t, c);
+    drawRipples(t);
     drawBuildings(town.buildings, t, c);
     drawBoats(town.boats, t, c);
     drawLighthouse(town.lighthouse, t, c);
+    drawPointer();
 
     // Quiet time-of-day readout, top-left — the clock made legible.
     ctx.font = "600 26px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";

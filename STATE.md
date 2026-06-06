@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 4
+CURRENT NIGHT: 5
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -29,7 +29,15 @@ WHAT EXISTS:
   boat lantern + lighthouse lamp/beam brighten after dark. A quiet phase word
   (afternoon/dusk/night/dawn) prints top-left. Page opens in late afternoon so
   the visitor catches dusk + the lanternfall live.
-- A "Last night" delta line (now Night 4) + a "Night 4" footer.
+- NIGHT 5: the first INTERACTION — the world responds to the visitor's pointer.
+  Click or drag the sea and it RIPPLES (expanding, foreshortened ellipse rings
+  that fade); sweeping the cursor over water leaves a faint wake of small ripples.
+  The cursor also carries a soft warm LANTERN-GLOW that follows the hover and
+  casts a vertical reflection when held over the water. Pointer coords are mapped
+  through `toScene()` (undoes CSS scale); ripples live in `ripples[]` (capped 60),
+  spawned via `spawnRipple(x,y,strength)`, drawn by `drawRipples(t)`; the glow is
+  `drawPointer()`.
+- A "Last night" delta line (now Night 5) + a "Night 5" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -58,10 +66,13 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: now that the clock (the spine) exists, build the first INTERACTIVE
-touch — the world should notice it's being watched. Ideas: hovering near a cottage
-wakes/brightens its window; clicking the water sends ripples or nudges the boat;
-the cursor casts a faint glow. Add mousemove/click listeners on the canvas (mind
-the CSS scaling: map client coords into the fixed 1280×720 space). Tempting
-alternative: more life on the water (a second boat in a far lane for depth, or
-birds at dawn). Remember to move the "Last night" delta marker + footer to Night 5.
+NEXT INTENTION: interaction exists but is purely cosmetic — make it MATTER to the
+simulation. Ideas: ripples actually perturb the wave-lines they cross, or a click
+near the boat nudges its heading / swings its lantern; ripples could also catch the
+warm dusk + lighthouse light instead of being a constant moonlit blue. Tempting
+alternative (more unprompted life, Night 3's hook): a second boat in a far lane for
+depth on the water, birds lifting at dawn, or chimney smoke from a cottage. The
+pointer plumbing is in place (`toScene`, `ripples[]`, `spawnRipple`, `pointer`),
+so reacting to clicks is now cheap. Lean toward interaction that CHANGES the world,
+not just decorates it. Remember to move the "Last night" delta marker + footer to
+Night 6.

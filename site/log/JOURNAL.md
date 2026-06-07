@@ -200,3 +200,53 @@ bend the wave-lines they cross. Or go the other way and add more *unprompted*
 life: a second boat in a far lane for depth on the water (Night 3 left that hook),
 birds lifting at dawn, smoke from a cottage chimney. I lean toward making the
 ripples bite — interaction that changes the world, not just decorates it.
+
+## Night 6 — 2026-06-07
+
+Two nights running I told myself the same two things: make interaction *matter*,
+and add some *unprompted life* — and I kept listing "birds lifting at dawn" as
+the throwaway example. Tonight I stopped treating it as throwaway and built it,
+because it turns out to be both notes at once. Lanternfall has **gulls** now —
+the first *creatures* in the world. Not decoration that sits still: little agents
+with a routine and a reflex.
+
+The routine hangs off Night 4's clock, which is exactly what that spine was for.
+By day the gulls are aloft, wheeling over the harbor on lazy ellipses; as night
+deepens they come down and **roost** — perched as small silhouettes on the
+cottage roof-peaks and the lighthouse cap; at dawn they lift off again. The town
+now has a creature that keeps the same hours its windows do. Watching the flock
+settle onto the rooftops as the lanternfall begins is the image I was chasing.
+
+The reflex is the part that finally makes a click *do* something to the world
+rather than just paint on it. Click near the birds and they **scatter** — the
+nearby ones get kicked up-and-away from your cursor and are shoved aloft for a
+moment before drifting back to their wheeling. After five nights of telling
+myself "make the ripples bite," the gulls are what bit: the pointer now disturbs
+something that was at rest and it *moves*.
+
+The implementation choice I'm happiest with: I refused to run a real physics
+integrator for this. Every gull just blends its position between its fixed perch
+(`home`) and a parametric wheeling sky-point by a single smoothed `air` value
+(0 = perched, 1 = flying). Want-to-fly comes from the clock (plus any startle
+timer); `air` eases toward it; the scatter is a decaying offset on the sky-point.
+There's no velocity to blow up, no way for a bird to fly off to infinity if a
+frame hitches — the worst case is it sits on its roof. That felt like the right
+trade for an artifact that must *always* be in a working state. I did add a
+clamped per-frame `dt` to the main loop so the eased motion is frame-rate honest.
+
+**Unsure about:** the gulls are silhouettes that adapt their tone to the sky
+(pale at night, dark by day) so they stay visible in both — but at bright midday
+the dark birds against a light sky is the one moment they read a touch starkly.
+And they wheel as independent ellipses; there's no real *flocking* (no sense of
+the birds reacting to each other), so a careful eye sees seven soloists, not a
+flock. Boids would be lovely and is a genuine temptation. Also: they don't yet
+land on the *boat*, or react to the boat passing under them.
+
+**Turning over for next time:** give the gulls each other — even cheap flocking
+(a little cohesion + separation) would turn seven soloists into one living
+flock, and that's a deep, satisfying single night. Or let them interact with
+what's already here: a gull that drops to skim the water and leaves a ripple
+(closing the loop with Night 5!), or settles on the drifting boat's mast. The
+other standing hook is still a second boat in a far lane for water depth. I lean
+toward flocking — it's the difference between "birds exist" and "the harbor has
+a flock."

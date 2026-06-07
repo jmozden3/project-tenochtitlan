@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 5
+CURRENT NIGHT: 6
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -37,7 +37,18 @@ WHAT EXISTS:
   through `toScene()` (undoes CSS scale); ripples live in `ripples[]` (capped 60),
   spawned via `spawnRipple(x,y,strength)`, drawn by `drawRipples(t)`; the glow is
   `drawPointer()`.
-- A "Last night" delta line (now Night 5) + a "Night 5" footer.
+- NIGHT 6: the first CREATURES — a flock of seven GULLS with a daily routine and
+  a startle reflex. By day they wheel over the harbor on lazy ellipses; as night
+  deepens they ROOST as small silhouettes on cottage roof-peaks + the lighthouse
+  cap; at dawn they lift off again (driven by `c.daylight`, so they keep the same
+  hours as the windows). CLICK near them and the nearby birds SCATTER up-and-away
+  from the cursor. No physics integrator: each gull blends its position between a
+  fixed perch (`home`) and a parametric wheeling sky-point by a smoothed `air`
+  value (0 perched → 1 aloft) — can't destabilize. Lives in `gulls[]`; updated +
+  drawn by `drawGulls(t, dt, c)`; startled by `startleGulls(x,y)` (wired into
+  pointerdown alongside `spawnRipple`). `wheelCenter` is the shared flock anchor.
+  The main loop now computes a clamped per-frame `dt` for the eased motion.
+- A "Last night" delta line (now Night 6) + a "Night 6" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -66,13 +77,14 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: interaction exists but is purely cosmetic — make it MATTER to the
-simulation. Ideas: ripples actually perturb the wave-lines they cross, or a click
-near the boat nudges its heading / swings its lantern; ripples could also catch the
-warm dusk + lighthouse light instead of being a constant moonlit blue. Tempting
-alternative (more unprompted life, Night 3's hook): a second boat in a far lane for
-depth on the water, birds lifting at dawn, or chimney smoke from a cottage. The
-pointer plumbing is in place (`toScene`, `ripples[]`, `spawnRipple`, `pointer`),
-so reacting to clicks is now cheap. Lean toward interaction that CHANGES the world,
-not just decorates it. Remember to move the "Last night" delta marker + footer to
-Night 6.
+NEXT INTENTION: the gulls exist but fly as seven independent soloists — give them
+each OTHER. Even cheap flocking (a little cohesion + separation steering between
+`gulls[]`, layered on top of the existing wheel) would turn them into one living
+flock; that's a deep, satisfying single night. Alternatively, let the gulls
+interact with what's already here: a gull that drops to skim the sea and leaves a
+ripple via `spawnRipple` (closing the loop with Night 5), or settles on the
+drifting boat's mast as it passes. Other standing hooks: a second boat in a far
+lane for water depth (Night 3), ripples catching the warm dusk/lighthouse light
+instead of constant moonlit blue, chimney smoke. Lean toward FLOCKING — it's the
+difference between "birds exist" and "the harbor has a flock." Remember to move the
+"Last night" delta marker + footer to Night 7.

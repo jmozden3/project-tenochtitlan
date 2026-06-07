@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> Lanternfall noticed you. <b>Touch the water</b> &mdash; click
-    or drag the sea and it <b>ripples</b>, rings spreading and fading on the surface.
-    Your cursor now carries a faint <b>lantern&#8209;glow</b> that follows you and
-    reflects on the water. The world&rsquo;s first response to a visitor.
+    <b>Last night:</b> Lanternfall has <b>gulls</b> now &mdash; the harbor&rsquo;s
+    first creatures. By day they wheel over the water; as night falls they settle
+    to <b>roost</b> on the rooftops and the lighthouse, and lift off again at dawn.
+    <b>Click near them</b> and the startled birds scatter up into the air.
   </p>
 
-  <footer>Night 5 &middot; founded 2026-06-02</footer>
+  <footer>Night 6 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -124,6 +124,55 @@
     }
   })();
 
+  // ---- Night 6: the harbor's GULLS — the first CREATURES in Lanternfall, with
+  // a daily routine and a startle reflex. By day they wheel over the water; as
+  // night deepens they settle to roost on the rooftops and the lighthouse cap;
+  // at dawn they lift off again. Click near them and the nearby birds scatter up.
+  // Each gull blends between its perch (home) and a wheeling sky-point by an
+  // `air` value (0 perched → 1 aloft), so the simulation can never destabilize.
+  const gulls = [];
+  const wheelCenter = { x: W * 0.46, y: town.horizon - 150 };
+  (() => {
+    const perches = [];
+    // A few cottage roof-peaks make good roosts.
+    for (const idx of [2, 4, 6, 7, 8]) {
+      const b = town.buildings[idx];
+      if (b) perches.push({ x: b.x, y: b.baseY - b.h - b.h * 0.34 - 2 });
+    }
+    // And the lighthouse cap — a classic gull perch.
+    const lh = town.lighthouse;
+    perches.push({ x: lh.x - 6, y: lh.baseY - lh.height - 22 - 6 });
+    perches.push({ x: lh.x + 8, y: lh.baseY - lh.height - 22 - 4 });
+
+    for (let i = 0; i < perches.length; i++) {
+      const rnd = k => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+      const home = perches[i];
+      gulls.push({
+        home, x: home.x, y: home.y,
+        wr: 46 + rnd(1) * 120,                                   // wheel radius
+        wspeed: (0.00055 + rnd(2) * 0.00055) * (rnd(5) < 0.5 ? -1 : 1),
+        wphase: rnd(3) * Math.PI * 2,
+        flapRate: 0.85 + rnd(4) * 0.5,
+        air: 0, scatterX: 0, scatterY: 0, startle: 0,
+      });
+    }
+  })();
+
+  // A click near the flock startles it: nearby birds get a kick up-and-away and
+  // are pushed aloft for a moment, whether they were roosting or already flying.
+  function startleGulls(x, y) {
+    for (const g of gulls) {
+      const dx = g.x - x, dy = g.y - y, d = Math.hypot(dx, dy);
+      if (d < 230) {
+        const k = (230 - d) / 230;
+        g.startle = Math.max(g.startle, 1500 + k * 1800);
+        const inv = d > 1 ? 1 / d : 0;
+        g.scatterX += dx * inv * 70 * k;
+        g.scatterY += dy * inv * 55 * k - 26 * k;   // bias the scatter upward
+      }
+    }
+  }
+
   // ---- Night 5: the world notices it's being WATCHED. The pointer is now a
   // presence in the scene — a faint carried lantern that glows where the visitor
   // hovers (and reflects on the water), and the sea RIPPLES where they touch it.
@@ -142,7 +191,7 @@
     if (ripples.length > 60) ripples.shift();
     ripples.push({ x, y, t0: performance.now(), s });
   }
-  canvas.addEventListener("pointerdown", e => { const p = toScene(e); spawnRipple(p.x, p.y, 1); });
+  canvas.addEventListener("pointerdown", e => { const p = toScene(e); spawnRipple(p.x, p.y, 1); startleGulls(p.x, p.y); });
   canvas.addEventListener("pointerleave", () => { pointer.inside = false; });
   canvas.addEventListener("pointermove", e => {
     const p = toScene(e);
@@ -557,6 +606,48 @@
     }
   }
 
+  // The gulls: update each bird's airborne/roosting state from the clock (and any
+  // lingering startle), blend its position between perch and a wheeling sky-point,
+  // then draw it — flapping wings aloft, a small plump silhouette when settled.
+  function drawGulls(t, dt, c) {
+    const dayFly = ss(0.22, 0.5, c.daylight);                 // aloft by day
+    const gc = lerpC([236,241,249], [58,66,84], c.daylight);  // pale at night, dark by day
+    for (const g of gulls) {
+      let want = dayFly;
+      if (g.startle > 0) { want = 1; g.startle -= dt; }
+      g.air += (want - g.air) * Math.min(1, dt * 0.0016);     // ease toward fly/roost
+      const ease = Math.min(1, dt * 0.0022);                  // scatter settles back
+      g.scatterX += -g.scatterX * ease;
+      g.scatterY += -g.scatterY * ease;
+
+      const ang = t * g.wspeed + g.wphase;
+      const fx = wheelCenter.x + Math.cos(ang) * g.wr + g.scatterX;
+      const fy = wheelCenter.y + Math.sin(ang) * g.wr * 0.55 + g.scatterY;
+      g.x = lerp(g.home.x, fx, g.air);
+      g.y = lerp(g.home.y, fy, g.air);
+
+      const a = 0.45 + 0.5 * g.air;
+      ctx.strokeStyle = `rgba(${gc[0]|0},${gc[1]|0},${gc[2]|0},${a})`;
+      ctx.fillStyle   = `rgba(${gc[0]|0},${gc[1]|0},${gc[2]|0},${a})`;
+      if (g.air > 0.14) {                                     // flying: a flapping V
+        const flap = Math.sin(t * 0.018 * g.flapRate + g.wphase);
+        const span = 7 + g.air * 5;
+        const tip = flap * 4.5;                               // wing-tips rise and fall
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(g.x - span, g.y - tip);
+        ctx.quadraticCurveTo(g.x - span * 0.35, g.y + 1.5, g.x, g.y);
+        ctx.quadraticCurveTo(g.x + span * 0.35, g.y + 1.5, g.x + span, g.y - tip);
+        ctx.stroke();
+      } else {                                                // perched: body + head
+        ctx.beginPath();
+        ctx.ellipse(g.x, g.y - 2, 3, 2.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(g.x - 0.8, g.y - 6, 1.6, 3);
+      }
+    }
+  }
+
   // The pointer as a carried light — a soft warm glow where the visitor hovers,
   // laying a reflection on the water when held over the sea.
   function drawPointer() {
@@ -577,7 +668,10 @@
   }
 
   // ---- Main loop ----
+  let lastT = 0;
   function frame(t) {
+    const dt = lastT ? Math.min(60, t - lastT) : 16;   // clamped per-frame delta
+    lastT = t;
     const c = clock(t);
     ctx.clearRect(0, 0, W, H);
     drawSky(c);
@@ -586,6 +680,7 @@
     drawBuildings(town.buildings, t, c);
     drawBoats(town.boats, t, c);
     drawLighthouse(town.lighthouse, t, c);
+    drawGulls(t, dt, c);
     drawPointer();
 
     // Quiet time-of-day readout, top-left — the clock made legible.

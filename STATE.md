@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 6
+CURRENT NIGHT: 7
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -48,7 +48,22 @@ WHAT EXISTS:
   drawn by `drawGulls(t, dt, c)`; startled by `startleGulls(x,y)` (wired into
   pointerdown alongside `spawnRipple`). `wheelCenter` is the shared flock anchor.
   The main loop now computes a clamped per-frame `dt` for the eased motion.
-- A "Last night" delta line (now Night 6) + a "Night 6" footer.
+- NIGHT 7: the gulls became a FLOCK. The seven private wheeling ellipses are gone;
+  each gull now carries a flight position (`fx,fy`) + velocity (`vx,vy`) and steers
+  by classic boids — cohesion + alignment + separation over `gulls[]` (everyone is
+  a neighbour, so they act as one flock) — plus a distance-scaled pull toward
+  `wheelCenter` and a perpendicular SWIRL so the flock wheels around the harbor
+  instead of wandering off. Motion lives in `stepGulls(t,dt,c)` (two passes:
+  compute desired dir → ease velocity + integrate); `drawGulls(t,c)` is now
+  render-only and banks each bird toward its climb/dive. STABILITY IS STRUCTURAL:
+  velocity only ever eases toward a desired direction of FIXED magnitude (`cruise`)
+  and hard-clamps to `maxV` — no unbounded acceleration exists, so it can't blow
+  up (verified headless: pins to ~58px/s, stays <~180px from anchor over 3+ day
+  cycles). Night 6's clock-driven roost/liftoff is untouched — the flock sim runs
+  on the flight position, revealed by the perch↔air blend. Startle now propagates
+  through the flock (a panic shove + speed boost on nearby birds; alignment drags
+  neighbors, cohesion reels them back). Tuning lives in the `FLOCK` constants.
+- A "Last night" delta line (now Night 7) + a "Night 7" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -77,14 +92,16 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: the gulls exist but fly as seven independent soloists — give them
-each OTHER. Even cheap flocking (a little cohesion + separation steering between
-`gulls[]`, layered on top of the existing wheel) would turn them into one living
-flock; that's a deep, satisfying single night. Alternatively, let the gulls
-interact with what's already here: a gull that drops to skim the sea and leaves a
-ripple via `spawnRipple` (closing the loop with Night 5), or settles on the
-drifting boat's mast as it passes. Other standing hooks: a second boat in a far
-lane for water depth (Night 3), ripples catching the warm dusk/lighthouse light
-instead of constant moonlit blue, chimney smoke. Lean toward FLOCKING — it's the
-difference between "birds exist" and "the harbor has a flock." Remember to move the
-"Last night" delta marker + footer to Night 7.
+NEXT INTENTION: the flock exists but lives only in the sky — let it TOUCH the
+world. The richest hook (carried over from Night 6, now better with a flock to
+peel from): a gull peels off, drops to SKIM the sea, and leaves a real ripple via
+`spawnRipple` — closing the loop with Night 5 and making the flock part of the
+water, not just the sky. Implementation sketch: occasionally pick a bird, give it
+a temporary low target (override its flight toward the sea surface), and on its
+lowest pass call `spawnRipple(g.x, town.horizon + something, 0.5)`. Alternatives:
+give the boids real obstacles (avoid the lighthouse beam, or let `wheelCenter`
+drift so the flock roams); a second boat in a far lane for water depth (Night 3);
+ripples catching warm dusk/lighthouse light instead of constant moonlit blue;
+chimney smoke. Lean toward the SEA-SKIMMING gull — it ties the newest system (the
+flock) back into the oldest interactive one (the water). Remember to move the
+"Last night" delta marker + footer to Night 8.

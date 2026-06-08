@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> Lanternfall has <b>gulls</b> now &mdash; the harbor&rsquo;s
-    first creatures. By day they wheel over the water; as night falls they settle
-    to <b>roost</b> on the rooftops and the lighthouse, and lift off again at dawn.
-    <b>Click near them</b> and the startled birds scatter up into the air.
+    <b>Last night:</b> the gulls became a <b>flock</b>. The seven birds no longer
+    wheel as soloists &mdash; they now fly <b>together</b>, with real cohesion,
+    alignment and separation, streaming and banking as one over the harbor.
+    <b>Click the water</b> to scatter them and watch the flock re-gather.
   </p>
 
-  <footer>Night 6 &middot; founded 2026-06-02</footer>
+  <footer>Night 7 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -149,8 +149,14 @@
       const home = perches[i];
       gulls.push({
         home, x: home.x, y: home.y,
-        wr: 46 + rnd(1) * 120,                                   // wheel radius
-        wspeed: (0.00055 + rnd(2) * 0.00055) * (rnd(5) < 0.5 ? -1 : 1),
+        // Night 7: each gull now flies as part of a FLOCK — it carries a flight
+        // position (fx,fy) and velocity (vx,vy) steered by its neighbours, not a
+        // private ellipse. Seeded loosely around the wheel anchor with a drift.
+        fx: wheelCenter.x + (rnd(6) - 0.5) * 280,
+        fy: wheelCenter.y + (rnd(7) - 0.5) * 130,
+        vx: Math.cos(rnd(3) * 6.283) * 50,
+        vy: Math.sin(rnd(3) * 6.283) * 50,
+        dvx: 0, dvy: 0,
         wphase: rnd(3) * Math.PI * 2,
         flapRate: 0.85 + rnd(4) * 0.5,
         air: 0, scatterX: 0, scatterY: 0, startle: 0,
@@ -214,6 +220,8 @@
   // Small math helpers.
   const ss   = (e0, e1, x) => { const k = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return k * k * (3 - 2 * k); };
   const lerp = (a, b, k) => a + (b - a) * k;
+  const normX = (x, y) => { const m = Math.hypot(x, y); return m > 1e-6 ? x / m : 0; };
+  const normY = (x, y) => { const m = Math.hypot(x, y); return m > 1e-6 ? y / m : 0; };
   const lerpC = (c1, c2, k) => [lerp(c1[0],c2[0],k), lerp(c1[1],c2[1],k), lerp(c1[2],c2[2],k)];
   const rgb  = c => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
 
@@ -606,26 +614,97 @@
     }
   }
 
-  // The gulls: update each bird's airborne/roosting state from the clock (and any
-  // lingering startle), blend its position between perch and a wheeling sky-point,
-  // then draw it — flapping wings aloft, a small plump silhouette when settled.
-  function drawGulls(t, dt, c) {
-    const dayFly = ss(0.22, 0.5, c.daylight);                 // aloft by day
-    const gc = lerpC([236,241,249], [58,66,84], c.daylight);  // pale at night, dark by day
+  // ---- Night 7: FLOCKING. The seven gulls used to wheel as soloists, each on its
+  // own fixed ellipse. Now they fly as ONE flock: every aloft gull steers by its
+  // neighbours — cohesion (pull toward the group), alignment (match their heading),
+  // separation (don't crowd) — plus a gentle pull-and-swirl around the harbour
+  // anchor so the flock wheels rather than wandering off-screen. Stability is
+  // STRUCTURAL, not tuned: each bird only ever eases its velocity toward a desired
+  // direction of FIXED magnitude (cruise speed) and hard-clamps to a max. There is
+  // no unbounded acceleration to blow up — the worst case is still a bird that just
+  // sits on its roof. The clock-driven roost/liftoff (Night 6) is untouched: the
+  // flock sim runs on the flight position, which the perch↔air blend reveals.
+  const FLOCK = {
+    neigh: 250, sep: 66,            // see-each-other radius / personal space (px)
+    wCoh: 0.7, wAli: 0.9, wSep: 1.7, wSwirl: 1.0, wHome: 1.5,   // steering weights
+    cruise: 58, maxV: 165,          // desired / hard-cap speed (px/s)
+    r0: 70, r1: 230,                // home pull fades in between these radii
+    turn: 2.6,                      // how fast velocity eases toward desired (per s)
+  };
+
+  function stepGulls(t, dt, c) {
+    const dts = Math.min(0.06, dt / 1000);                   // seconds, clamped
+    const dayFly = ss(0.22, 0.5, c.daylight);                // aloft by day
+    const N2 = FLOCK.neigh * FLOCK.neigh, S2 = FLOCK.sep * FLOCK.sep;
+
+    // Pass 1: from each bird's neighbours, build a desired flight direction.
     for (const g of gulls) {
+      let cx = 0, cy = 0, ax = 0, ay = 0, sx = 0, sy = 0, n = 0, ns = 0;
+      for (const o of gulls) {
+        if (o === g) continue;
+        const dx = o.fx - g.fx, dy = o.fy - g.fy, d2 = dx * dx + dy * dy;
+        if (d2 < N2) {
+          cx += o.fx; cy += o.fy; ax += o.vx; ay += o.vy; n++;
+          if (d2 < S2 && d2 > 0.01) { const d = Math.sqrt(d2); sx -= dx / d; sy -= dy / d; ns++; }
+        }
+      }
+      let dirX = 0, dirY = 0;
+      if (n > 0) {
+        dirX += normX(cx / n - g.fx, cy / n - g.fy) * FLOCK.wCoh;   // cohesion
+        dirY += normY(cx / n - g.fx, cy / n - g.fy) * FLOCK.wCoh;
+        dirX += normX(ax / n, ay / n) * FLOCK.wAli;                 // alignment
+        dirY += normY(ax / n, ay / n) * FLOCK.wAli;
+      }
+      if (ns > 0) { dirX += normX(sx, sy) * FLOCK.wSep; dirY += normY(sx, sy) * FLOCK.wSep; }
+      // Pull back toward the harbour anchor, stronger the farther it has drifted…
+      const hx = wheelCenter.x - g.fx, hy = wheelCenter.y - g.fy;
+      const dist = Math.hypot(hx, hy) || 1;
+      const homeW = FLOCK.wHome * ss(FLOCK.r0, FLOCK.r1, dist);
+      dirX += (hx / dist) * homeW; dirY += (hy / dist) * homeW;
+      // …and a perpendicular swirl so the whole flock wheels around it.
+      dirX += (-hy / dist) * FLOCK.wSwirl; dirY += (hx / dist) * FLOCK.wSwirl;
+      // A fresh startle dominates everything: shove along the scatter vector, fast.
+      const sm = Math.hypot(g.scatterX, g.scatterY);
+      let cruise = FLOCK.cruise;
+      if (sm > 0.5) {
+        const w = Math.min(3, sm / 30);
+        dirX += (g.scatterX / sm) * w; dirY += (g.scatterY / sm) * w;
+        if (g.startle > 0) cruise += 70;                     // panic is faster
+      }
+      // Desired velocity: fixed magnitude, in the blended direction.
+      const dl = Math.hypot(dirX, dirY);
+      if (dl > 1e-4) { g.dvx = (dirX / dl) * cruise; g.dvy = (dirY / dl) * cruise; }
+      else { g.dvx = g.vx; g.dvy = g.vy; }
+    }
+
+    // Pass 2: ease velocity toward desired, clamp, integrate, blend perch↔air.
+    const k = Math.min(1, FLOCK.turn * dts);
+    for (const g of gulls) {
+      g.vx += (g.dvx - g.vx) * k;
+      g.vy += (g.dvy - g.vy) * k;
+      const sp = Math.hypot(g.vx, g.vy);
+      if (sp > FLOCK.maxV) { g.vx = g.vx / sp * FLOCK.maxV; g.vy = g.vy / sp * FLOCK.maxV; }
+      g.fx += g.vx * dts; g.fy += g.vy * dts;
+
+      // Want-to-fly from the clock (plus any lingering startle), eased into `air`.
       let want = dayFly;
       if (g.startle > 0) { want = 1; g.startle -= dt; }
-      g.air += (want - g.air) * Math.min(1, dt * 0.0016);     // ease toward fly/roost
-      const ease = Math.min(1, dt * 0.0022);                  // scatter settles back
-      g.scatterX += -g.scatterX * ease;
-      g.scatterY += -g.scatterY * ease;
+      g.air += (want - g.air) * Math.min(1, dt * 0.0016);
+      // Scatter decays back to nothing.
+      const e = Math.min(1, dt * 0.0022);
+      g.scatterX -= g.scatterX * e; g.scatterY -= g.scatterY * e;
 
-      const ang = t * g.wspeed + g.wphase;
-      const fx = wheelCenter.x + Math.cos(ang) * g.wr + g.scatterX;
-      const fy = wheelCenter.y + Math.sin(ang) * g.wr * 0.55 + g.scatterY;
-      g.x = lerp(g.home.x, fx, g.air);
-      g.y = lerp(g.home.y, fy, g.air);
+      // On-screen position blends the rooftop perch and the live flight position.
+      g.x = lerp(g.home.x, g.fx, g.air);
+      g.y = lerp(g.home.y, g.fy, g.air);
+    }
+  }
 
+  // The gulls, rendered: a flapping V that banks toward its heading when aloft (so
+  // the flock visibly streams together), a small plump silhouette when roosting.
+  function drawGulls(t, c) {
+    const gc = lerpC([236,241,249], [58,66,84], c.daylight);  // pale at night, dark by day
+    for (const g of gulls) {
       const a = 0.45 + 0.5 * g.air;
       ctx.strokeStyle = `rgba(${gc[0]|0},${gc[1]|0},${gc[2]|0},${a})`;
       ctx.fillStyle   = `rgba(${gc[0]|0},${gc[1]|0},${gc[2]|0},${a})`;
@@ -633,12 +712,18 @@
         const flap = Math.sin(t * 0.018 * g.flapRate + g.wphase);
         const span = 7 + g.air * 5;
         const tip = flap * 4.5;                               // wing-tips rise and fall
+        // Bank with the climb/dive of travel — symmetric, so left/right reads alike.
+        const tilt = Math.max(-0.6, Math.min(0.6, Math.atan2(g.vy, Math.abs(g.vx) + 1)));
+        ctx.save();
+        ctx.translate(g.x, g.y);
+        ctx.rotate(tilt);
         ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.moveTo(g.x - span, g.y - tip);
-        ctx.quadraticCurveTo(g.x - span * 0.35, g.y + 1.5, g.x, g.y);
-        ctx.quadraticCurveTo(g.x + span * 0.35, g.y + 1.5, g.x + span, g.y - tip);
+        ctx.moveTo(-span, -tip);
+        ctx.quadraticCurveTo(-span * 0.35, 1.5, 0, 0);
+        ctx.quadraticCurveTo(span * 0.35, 1.5, span, -tip);
         ctx.stroke();
+        ctx.restore();
       } else {                                                // perched: body + head
         ctx.beginPath();
         ctx.ellipse(g.x, g.y - 2, 3, 2.2, 0, 0, Math.PI * 2);
@@ -680,7 +765,8 @@
     drawBuildings(town.buildings, t, c);
     drawBoats(town.boats, t, c);
     drawLighthouse(town.lighthouse, t, c);
-    drawGulls(t, dt, c);
+    stepGulls(t, dt, c);
+    drawGulls(t, c);
     drawPointer();
 
     // Quiet time-of-day readout, top-left — the clock made legible.

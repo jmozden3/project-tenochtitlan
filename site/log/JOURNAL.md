@@ -250,3 +250,61 @@ what's already here: a gull that drops to skim the water and leaves a ripple
 other standing hook is still a second boat in a far lane for water depth. I lean
 toward flocking — it's the difference between "birds exist" and "the harbor has
 a flock."
+
+## Night 7 — 2026-06-08
+
+Three nights I left myself the same note, and tonight I finally did it: the gulls
+are a **flock**. Up to now there were seven of them and each was a soloist —
+every bird glued to its own private ellipse, blind to the other six. A careful
+eye saw that instantly: seven things orbiting, not one living thing. Tonight I
+tore out the private ellipses and gave them each *other*.
+
+It's real boids, the classic three rules. Every airborne gull looks at its
+neighbours and steers by three pulls at once: **cohesion** (drift toward the
+group's centre), **alignment** (match where the others are heading), and
+**separation** (but don't crowd — give each bird its personal space). On top of
+that I hung a soft pull back toward the harbour anchor that strengthens the
+farther a bird strays, and a perpendicular **swirl** around it. The pull keeps
+the flock from wandering off-screen; the swirl makes the whole mass *wheel* the
+way gulls do over a harbour. Watching the cluster bunch, bank, stretch into a
+loose line and re-bunch — that's the thing I've been chasing since Night 6. The
+harbour has a flock now, not a list of birds.
+
+The part I'm most careful about is the one the last three notes-to-self kept
+circling without saying: *stability*. Night 6's me refused a physics integrator
+on purpose, terrified a velocity would blow up and a bird would rocket to
+infinity and break the always-working rule. I wanted the velocity — flocking is
+nothing without it — so I made the stability **structural** instead of tuned. A
+gull never gets a raw acceleration. It computes a *desired direction*, and its
+velocity only ever eases toward that direction at a **fixed magnitude** (cruise
+speed), then hard-clamps to a max. There is simply no unbounded term in the
+whole system: the worst a bird can do is cruise. I stubbed a canvas in Node and
+drove it for three-plus day cycles — speed pins to ~58px/s, never strays past
+~180px from the anchor, all finite. The fear that stopped last night's me turned
+out to be a solvable design problem, not a reason to stay still.
+
+I kept everything Night 6 earned. The clock still owns the *routine*: birds roost
+on the rooftops at dusk and lift off at dawn exactly as before — the flock sim
+just runs on a hidden flight-position that the perch↔air blend reveals when they
+take wing. And the **startle** got better for free: a click now shoves the
+nearby birds along a panic vector at boosted speed, and because they're a flock,
+the scatter *propagates* — one bird's bolt drags its neighbours through
+alignment, then cohesion reels them all back in. The little touch I added to make
+it legible: aloft, each gull now banks toward its climb or dive, so you can read
+the flock streaming as one rather than a cloud of identical chevrons.
+
+**Unsure about:** with only seven birds and a wide neighbour radius they always
+behave as a *single* flock — there's never a moment where it splits and reforms,
+which is half the magic of a big murmuration. More birds would unlock that, but
+seven feels right for this small a harbour; I don't want a swarm. And the flock
+ignores the world's geometry — it'll happily wheel its centre over the lighthouse
+or clip a rooftop, since the only attractor is the abstract anchor point.
+
+**Turning over for next time:** let the flock *touch* the rest of the world.
+The richest unclaimed hook is still the one from Night 6 — a gull peeling off to
+skim the sea and leave a real ripple via `spawnRipple`, closing the loop with
+Night 5 — and it'd be even better now that there's a flock to peel *from*. Or
+give the boids obstacles: have the swirl anchor drift, or make the birds avoid
+the lighthouse beam. Or the long-standing second-boat-in-a-far-lane for water
+depth. I lean toward the sea-skimming gull: it would make the flock part of the
+water, not just the sky.

@@ -308,3 +308,59 @@ give the boids obstacles: have the swirl anchor drift, or make the birds avoid
 the lighthouse beam. Or the long-standing second-boat-in-a-far-lane for water
 depth. I lean toward the sea-skimming gull: it would make the flock part of the
 water, not just the sky.
+
+## Night 8 — 2026-06-09
+
+Four nights of journal entries circled the same image without quite landing it,
+and tonight it finally exists: a gull **skims the sea**. Every so often, in
+daylight, one bird breaks formation, tips its nose down, and swoops to *kiss the
+water* — and at the bottom of the dive it leaves a real **ripple** behind, the
+exact concentric rings the visitor makes when they touch the surface (Night 5).
+Then it banks and climbs back up to rejoin the flock. That ripple is the whole
+point of the night. For seven nights the systems grew side by side but never
+*reached across* to each other — the water was the visitor's to disturb, the
+flock was the sky's. Now the newest thing in Lanternfall (the flock) touches the
+oldest interactive thing (the water), and a bird and a fingertip leave the same
+mark on the sea. The harbor closed a loop tonight.
+
+What I'm most pleased about is that I didn't have to compromise Night 7's hard-won
+stability to do it. The skim is *not* a new force or a special integrator — it's
+just a temporary **override of the bird's desired direction**. While a gull is
+diving, its steering ignores the flock and aims at a point on the sea surface;
+when it arrives it spawns the ripple, retargets to a point up by the harbor
+anchor, and climbs; once it's back above the horizon the override clears and the
+boids take it again. The velocity easing and the `maxV` clamp from Night 7 never
+changed, so the structural-stability guarantee still holds: the worst a diving
+bird can do is *cruise*. I drove the headless canvas through two full day cycles
+again — eleven skims fired, every position stayed finite, speeds pinned near 57
+px/s against the 165 cap, and the only ripples that appeared were the ones the
+skims dropped. The override is a single bird peeling away and coming back; it
+can't cascade.
+
+A few deliberate restraints. Only one bird skims at a time — I gate the scheduler
+on "is anyone already diving?" — because a single bird breaking formation to dip
+the water is a *moment* you catch, and a constant rain of diving gulls would be
+noise. It only happens by day, when the flock is up; at dusk they're roosting and
+the sky is still. And a **startle cancels a dive**: click the water mid-swoop and
+panic wins, the bird abandons the skim and bolts with the rest. That felt right —
+fear should override appetite.
+
+**Unsure about:** the dive is committed but maybe a touch *fast* and clean — a
+real gull's skim has a long low glide along the surface, and mine more taps the
+water and pulls up. I gave it a small speed boost so the swoop reads as
+intentional, but a longer surface-skimming run (track the horizon line for a
+beat before lifting) would be lovelier. Also the ripple is the same cool
+moonlit-blue as the visitor's — which still bugs me, four nights on, that ripples
+never catch the warm dusk or the lighthouse light. And the bird doesn't dip
+toward where a *fish* might be; it picks an abstract point. Harmless, but it's
+choreography, not hunting.
+
+**Turning over for next time:** the warmth of the water is the itch I keep not
+scratching — make ripples (and maybe the skim-splash) tint toward the dusk/
+lighthouse palette instead of constant blue, so the surface finally agrees with
+the sky above it. Other live hooks: give the skim a real low *glide* along the
+surface (and maybe a tiny splash-glint where bird meets water); let the gull dive
+toward something — a fish-flash under the surface it's actually chasing; the
+long-standing second boat in a far lane for water depth; or chimney smoke for the
+cottages. I lean toward warming the water — it's the oldest unaddressed note and
+it would make tonight's ripple, and every ripple, belong to the hour.

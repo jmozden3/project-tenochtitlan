@@ -54,13 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the gulls became a <b>flock</b>. The seven birds no longer
-    wheel as soloists &mdash; they now fly <b>together</b>, with real cohesion,
-    alignment and separation, streaming and banking as one over the harbor.
-    <b>Click the water</b> to scatter them and watch the flock re-gather.
+    <b>Last night:</b> a gull now <b>skims the sea</b>. Every so often one bird
+    peels off the flock, swoops down to <b>kiss the water</b> &mdash; and leaves a
+    real <b>ripple</b> behind, the same rings your own touch makes. Watch the
+    daytime sky: one of them will break formation and dive. <b>Click the water</b>
+    to scatter the flock.
   </p>
 
-  <footer>Night 7 &middot; founded 2026-06-02</footer>
+  <footer>Night 8 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -160,6 +161,7 @@
         wphase: rnd(3) * Math.PI * 2,
         flapRate: 0.85 + rnd(4) * 0.5,
         air: 0, scatterX: 0, scatterY: 0, startle: 0,
+        skim: null,                 // Night 8: set when this bird peels off to skim the sea
       });
     }
   })();
@@ -632,10 +634,40 @@
     turn: 2.6,                      // how fast velocity eases toward desired (per s)
   };
 
+  // ---- Night 8: a gull SKIMS the sea. Every so often one bird peels off the
+  // flock, dives to kiss the water surface — and leaves a real ripple via
+  // `spawnRipple`, the very thing the visitor's touch makes (Night 5). It then
+  // swoops back up to rejoin the flock. The skim only overrides the bird's
+  // DESIRED direction; the fixed-magnitude easing + maxV clamp are untouched, so
+  // stability stays structural — the worst a diving bird can do is cruise.
+  const SKIM = {
+    surfaceY: 34,     // px below the horizon the bird kisses (the water's surface)
+    pull: 3.2,        // how hard the skim target dominates the bird's steering
+    boost: 26,        // extra cruise speed during a swoop, so it reads as committed
+    reach: 16,        // how close (px) to the target counts as "arrived"
+    every: 7000, jitter: 6500,   // ms between skim attempts (+ random jitter)
+  };
+  let skimTimer = 3500;           // first skim a few seconds after load
+
+  // Send one eligible bird into a dive: aloft, calm, and only by day (when the
+  // flock is up). Never more than one skim at a time, to keep it a singular event.
+  function tryStartSkim(c) {
+    if (c.daylight < 0.45) return;
+    if (gulls.some(g => g.skim)) return;
+    const cand = gulls.filter(g => g.air > 0.85 && g.startle <= 0);
+    if (!cand.length) return;
+    const g = cand[(Math.random() * cand.length) | 0];
+    g.skim = { stage: "dive", tx: W * (0.24 + Math.random() * 0.46), ty: town.horizon + SKIM.surfaceY };
+  }
+
   function stepGulls(t, dt, c) {
     const dts = Math.min(0.06, dt / 1000);                   // seconds, clamped
     const dayFly = ss(0.22, 0.5, c.daylight);                // aloft by day
     const N2 = FLOCK.neigh * FLOCK.neigh, S2 = FLOCK.sep * FLOCK.sep;
+
+    // Occasionally send a bird down to skim the sea.
+    skimTimer -= dt;
+    if (skimTimer <= 0) { tryStartSkim(c); skimTimer = SKIM.every + Math.random() * SKIM.jitter; }
 
     // Pass 1: from each bird's neighbours, build a desired flight direction.
     for (const g of gulls) {
@@ -670,6 +702,25 @@
         const w = Math.min(3, sm / 30);
         dirX += (g.scatterX / sm) * w; dirY += (g.scatterY / sm) * w;
         if (g.startle > 0) cruise += 70;                     // panic is faster
+      }
+      // A skimming bird abandons the flock and aims for its sea target — a being
+      // startled cancels the dive (panic wins). The override replaces the steering
+      // entirely, so the bird peels cleanly away and swoops back.
+      if (g.skim && g.startle > 0) g.skim = null;
+      if (g.skim) {
+        const sk = g.skim;
+        const tdx = sk.tx - g.fx, tdy = sk.ty - g.fy, td = Math.hypot(tdx, tdy) || 1;
+        dirX = (tdx / td) * SKIM.pull; dirY = (tdy / td) * SKIM.pull;
+        cruise += SKIM.boost;
+        if (sk.stage === "dive" && td < SKIM.reach) {
+          // The bird kisses the water — leave a real ripple, then climb back home.
+          spawnRipple(g.fx, town.horizon + SKIM.surfaceY, 0.5);
+          sk.stage = "climb";
+          sk.tx = wheelCenter.x + (Math.random() - 0.5) * 200;
+          sk.ty = wheelCenter.y;
+        } else if (sk.stage === "climb" && g.fy < town.horizon - 50) {
+          g.skim = null;                                     // back in the sky; rejoin the flock
+        }
       }
       // Desired velocity: fixed magnitude, in the blended direction.
       const dl = Math.hypot(dirX, dirY);

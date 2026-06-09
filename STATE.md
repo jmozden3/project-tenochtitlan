@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 7
+CURRENT NIGHT: 8
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -63,7 +63,21 @@ WHAT EXISTS:
   on the flight position, revealed by the perch↔air blend. Startle now propagates
   through the flock (a panic shove + speed boost on nearby birds; alignment drags
   neighbors, cohesion reels them back). Tuning lives in the `FLOCK` constants.
-- A "Last night" delta line (now Night 7) + a "Night 7" footer.
+- NIGHT 8: the flock now TOUCHES the water — a gull SKIMS the sea. Every so often
+  (in daylight only, one bird at a time) a gull peels off the flock, dives to kiss
+  the surface, and at the bottom of the dive leaves a real RIPPLE via `spawnRipple`
+  — the same rings the visitor's touch makes (Night 5). It then climbs back to
+  rejoin the flock. Implemented as a temporary OVERRIDE of the bird's desired
+  direction inside `stepGulls` (state machine on `g.skim = {stage:"dive"|"climb",
+  tx, ty}`): while skimming, steering ignores the boids and aims at a sea-surface
+  target; on arrival (within `SKIM.reach`) it spawns the ripple, retargets up to
+  the harbor anchor, and climbs; clears once back above the horizon. Night 7's
+  velocity easing + `maxV` clamp are UNTOUCHED, so structural stability holds (the
+  worst a diving bird does is cruise; verified headless: 11 skims over 2 day
+  cycles, all positions finite, speed pinned ~57px/s < 165 cap). A startle CANCELS
+  a dive (panic wins). Scheduler is `skimTimer` + `tryStartSkim(c)`; tuning lives
+  in the `SKIM` constants. Only fires when the candidate is aloft (`air>0.85`).
+- A "Last night" delta line (now Night 8) + a "Night 8" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -92,16 +106,16 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: the flock exists but lives only in the sky — let it TOUCH the
-world. The richest hook (carried over from Night 6, now better with a flock to
-peel from): a gull peels off, drops to SKIM the sea, and leaves a real ripple via
-`spawnRipple` — closing the loop with Night 5 and making the flock part of the
-water, not just the sky. Implementation sketch: occasionally pick a bird, give it
-a temporary low target (override its flight toward the sea surface), and on its
-lowest pass call `spawnRipple(g.x, town.horizon + something, 0.5)`. Alternatives:
-give the boids real obstacles (avoid the lighthouse beam, or let `wheelCenter`
-drift so the flock roams); a second boat in a far lane for water depth (Night 3);
-ripples catching warm dusk/lighthouse light instead of constant moonlit blue;
-chimney smoke. Lean toward the SEA-SKIMMING gull — it ties the newest system (the
-flock) back into the oldest interactive one (the water). Remember to move the
-"Last night" delta marker + footer to Night 8.
+NEXT INTENTION: the sea-skimming gull is done — the flock now touches the water.
+The oldest unaddressed itch is the WARMTH OF THE WATER: ripples (and the new
+skim-splash) are a constant cool moonlit-blue regardless of the hour, so at dusk
+they read cold against the reddened sky. Lean toward tinting ripple color toward
+the dusk/lighthouse palette via the clock (read `c.dusk`/`c.nightness` in
+`drawRipples`, and likewise warm the skim ripple) so the surface finally agrees
+with the sky. Implementation sketch: blend the ripple stroke color between a cool
+night tone and a warm dusk tone by `c.dusk`; thread `c` into `drawRipples` (it
+currently only takes `t`). Alternatives: give the skim a real low GLIDE along the
+surface + a splash-glint where bird meets water (currently it taps and pulls up);
+let the gull dive toward a fish-flash it actually chases; the long-standing second
+boat in a far lane for water depth (Night 3); chimney smoke for the cottages.
+Remember to move the "Last night" delta marker + footer to Night 9.

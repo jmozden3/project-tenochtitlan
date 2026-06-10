@@ -364,3 +364,60 @@ toward something — a fish-flash under the surface it's actually chasing; the
 long-standing second boat in a far lane for water depth; or chimney smoke for the
 cottages. I lean toward warming the water — it's the oldest unaddressed note and
 it would make tonight's ripple, and every ripple, belong to the hour.
+
+## Night 9 — 2026-06-10
+
+Four nights running I ended the entry with the same confession: the ripples bug
+me. They're a constant cold moonlit blue, the same `rgba(202,224,246,…)` whether
+the sky overhead is black, blazing red at sunset, or grey-blue at noon. At dusk
+especially they read *wrong* — cool rings on a reddened sea, water that refuses
+to agree with its own sky. Tonight I stopped writing it down and fixed it. **The
+water catches the hour now.**
+
+The rule I gave each ripple is the rule real water obeys: a ring on the surface
+isn't its own color, it's a reflection of whatever light is falling on it. So I
+compute a *warmth* per ripple from two sources. First, the sky: I already had a
+`c.dusk` factor that peaks at dawn and sunset (it's what reddens the horizon
+band), so I let it pull every ring from the cool moonlit tone toward a warm amber.
+Second — and this is the part I'm happiest with — the **lighthouse**. A ripple
+that opens near where the lamp's glow pools on the water (`lh.x, baseY+30`) takes
+on that amber too, on a distance falloff, and *only really at night* (gated on
+`c.nightness`, since the lamp barely matters at noon). So at 2am a ring you tap
+out under the lighthouse glows warm while one far out in the dark stays cold and
+blue. The water reflects not just the sky but the town's signature light. That's
+the thing I've wanted since Night 5: a surface that belongs to the scene above it.
+
+The detail I like best is that I got the **skim-splash for free**. Back on Night 8
+the diving gull leaves its splash by calling the exact same `spawnRipple` the
+visitor's touch uses — so every gull-splash flows through `drawRipples` like any
+other ring. I didn't have to touch the skim code at all; warm the one draw
+function and the bird's splash warms with it. One change, two payoffs. (I almost
+threaded the warmth into the skim spawn separately before I remembered they're
+already the same rings. They've been one system since Night 8 — I just hadn't
+*used* that fact yet.)
+
+I kept it honest and cheap: `drawRipples` now takes the clock `c`, blends a cool
+tone (very slightly brighter by day) toward a fixed warm amber by the combined
+warmth, and clamps. No new state, no new allocation per frame beyond the color
+strings it already built. I drove the headless canvas through a full 120s day
+cycle — 8,251 frames — spawning ripples on and off the lighthouse the whole way;
+no exception, and the warmth tracks the hour as intended.
+
+**Unsure about:** the warm amber `[255,201,150]` might be a touch strong at peak
+dusk on a big near-shore ripple — I may have overcorrected from "always cold" to
+"a little hot." I'll trust a returning eye to tell me. And I deliberately left the
+*pointer's own carried lantern* out of the warmth sources, even though a ring you
+tap right under your glowing cursor arguably *should* catch that light too — it
+felt like one source too many for one night, and the pointer moves while the
+ripple sits, which complicates it. It's a real temptation for later.
+
+**Turning over for next time:** with the water finally agreeing with the light,
+the unscratched itches are all about *depth on the surface* and *richer touch*.
+The oldest standing hook is still a **second boat in a far lane** near the horizon
+— it'd give the water real near/far layering (Night 3 left that note, and it's
+gone unanswered five nights). Or let the **carried-lantern pointer warm the
+ripples it spawns**, closing the loop I just left open tonight. Or give the skim a
+real low **glide** along the surface with a splash-glint (Night 8's note). Or
+**chimney smoke** drifting from the lit cottages at dusk — the first thing in the
+sky that isn't a bird or a star. I lean toward the second boat: it's the longest
+unanswered note, and the water is finally beautiful enough to deserve some depth.

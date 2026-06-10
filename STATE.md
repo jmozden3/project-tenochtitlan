@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 8
+CURRENT NIGHT: 9
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -77,7 +77,22 @@ WHAT EXISTS:
   cycles, all positions finite, speed pinned ~57px/s < 165 cap). A startle CANCELS
   a dive (panic wins). Scheduler is `skimTimer` + `tryStartSkim(c)`; tuning lives
   in the `SKIM` constants. Only fires when the candidate is aloft (`air>0.85`).
-- A "Last night" delta line (now Night 8) + a "Night 8" footer.
+- NIGHT 9: the WATER CATCHES THE HOUR. For four nights every ripple was a constant
+  cold moonlit blue regardless of the sky; now each ring reflects the light around
+  it. `drawRipples(t, c)` takes the clock and computes a per-ripple WARMTH from two
+  sources: (1) the sky — `c.dusk` (peaks at dawn/sunset) pulls every ring from a
+  cool tone toward a warm amber `[255,201,150]`; (2) the LIGHTHOUSE — a ring opening
+  near where its lamp pools on the water (`lh.x, lh.baseY+30`) takes the amber too,
+  on a 240px distance falloff, gated on `c.nightness` so it only matters after dark.
+  `warmth = min(1, c.dusk*0.8 + near*0.9)`; the ring color is `lerpC(cool, warm,
+  warmth)` where `cool` is itself slightly brighter by day. The skim-splash warms
+  FOR FREE: the diving gull's ripple (Night 8) goes through the same `spawnRipple`
+  /`drawRipples`, so warming the one draw function warms both. No new state, no
+  per-frame allocation beyond the color strings already built. Verified headless:
+  8251 frames over a full day cycle, ripples spawned near + far from the lighthouse,
+  no exceptions. The pointer's own carried lantern is deliberately NOT a warmth
+  source yet (left as a future loop to close).
+- A "Last night" delta line (now Night 9) + a "Night 9" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -106,16 +121,20 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: the sea-skimming gull is done — the flock now touches the water.
-The oldest unaddressed itch is the WARMTH OF THE WATER: ripples (and the new
-skim-splash) are a constant cool moonlit-blue regardless of the hour, so at dusk
-they read cold against the reddened sky. Lean toward tinting ripple color toward
-the dusk/lighthouse palette via the clock (read `c.dusk`/`c.nightness` in
-`drawRipples`, and likewise warm the skim ripple) so the surface finally agrees
-with the sky. Implementation sketch: blend the ripple stroke color between a cool
-night tone and a warm dusk tone by `c.dusk`; thread `c` into `drawRipples` (it
-currently only takes `t`). Alternatives: give the skim a real low GLIDE along the
-surface + a splash-glint where bird meets water (currently it taps and pulls up);
-let the gull dive toward a fish-flash it actually chases; the long-standing second
-boat in a far lane for water depth (Night 3); chimney smoke for the cottages.
-Remember to move the "Last night" delta marker + footer to Night 9.
+NEXT INTENTION: the water now agrees with the light — that four-night itch is
+finally scratched. The strongest remaining hook, and the LONGEST unanswered (open
+since Night 3, five nights), is a SECOND BOAT in a far lane near the horizon: a
+smaller, slower, dimmer boat drifting between the cottages and the headland would
+give the water real near/far LAYERING (right now everything floats in one plane).
+Boats are data-driven — push another `{baseY, scale, speed, offset, phase}` into
+`town.boats` with a baseY just below the horizon, a smaller `scale` (~1.0), a
+slower `speed`, and dial its lantern/wake down so it reads as distant; `drawBoats`
+already walks the list. Watch z-order: a far boat should be drawn so the near boat
+and the cottages' waterline sit in front of it (consider sorting boats by baseY or
+drawing the far lane before buildings). Alternatives: let the carried-lantern
+POINTER warm the ripples it spawns (close the loop Night 9 left open — feed the
+pointer position into the ripple warmth, only while held over water); give the
+skim a real low GLIDE + splash-glint (Night 8); CHIMNEY SMOKE drifting from the
+lit cottages at dusk (first non-bird thing in the sky). I lean toward the second
+boat — oldest note, and the water finally deserves some depth.
+Remember to move the "Last night" delta marker + footer to Night 10.

@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> a gull now <b>skims the sea</b>. Every so often one bird
-    peels off the flock, swoops down to <b>kiss the water</b> &mdash; and leaves a
-    real <b>ripple</b> behind, the same rings your own touch makes. Watch the
-    daytime sky: one of them will break formation and dive. <b>Click the water</b>
-    to scatter the flock.
+    <b>Last night:</b> the water finally <b>catches the hour</b>. Every ripple
+    &mdash; the ones <b>your touch</b> makes and the splash a <b>diving gull</b>
+    leaves &mdash; used to stay a cold moonlit blue. Now they <b>warm toward the
+    reddened dusk sky</b>, and glow <b>amber when they ride near the lighthouse</b>.
+    <b>Click the water</b> at dusk to see the rings catch fire.
   </p>
 
-  <footer>Night 8 &middot; founded 2026-06-02</footer>
+  <footer>Night 9 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -593,8 +593,20 @@
   // The visitor's touch on the water: concentric rings that expand, flatten
   // with the water's perspective (wider than tall), and fade out. Drawn straight
   // onto the surface so everything afloat rides over them.
-  function drawRipples(t) {
+  // ---- Night 9: the rings finally CATCH THE HOUR. For four nights every ripple
+  // (yours, and the skim-splash the diving gull leaves) was the same cold moonlit
+  // blue regardless of the sky. Now each ring reflects the light around it: the
+  // reddened dawn/dusk sky warms every ripple, and a ring that rides near the
+  // lighthouse's pooled glow takes on its amber — strongest after dark when the
+  // lamp matters most. The water finally agrees with the sky and the lights above.
+  function drawRipples(t, c) {
     const LIFE = 2600;
+    // Cool moonlit tone the rings rest at (a touch brighter by day) ↔ warm catch.
+    const cool = lerpC([196,219,243], [216,234,250], c.daylight);
+    const warm = [255,201,150];
+    const lh = town.lighthouse;
+    const lhx = lh.x, lhy = lh.baseY + 30;            // where the lamp pools on the water
+    const lamp = 0.2 + 0.8 * c.nightness;             // the lighthouse matters most after dark
     for (let i = ripples.length - 1; i >= 0; i--) {
       const rp = ripples[i];
       const age = t - rp.t0;
@@ -605,12 +617,19 @@
       const rx = maxR * Math.sqrt(p);                // fast open, then ease out
       const ry = rx * 0.30;                          // foreshortened on the water
       const a = (1 - p) * 0.5 * rp.s;
-      ctx.strokeStyle = `rgba(202,224,246,${a})`;
+      // How warm is the water *here*? The dusk sky warms every ring; nearness to
+      // the lighthouse's glow warms it further (and only really at night).
+      const ddx = rp.x - lhx, ddy = rp.y - lhy;
+      const near = Math.max(0, 1 - Math.hypot(ddx, ddy) / 240) * lamp;
+      const warmth = Math.min(1, c.dusk * 0.8 + near * 0.9);
+      const col = lerpC(cool, warm, warmth);
+      const cs = `${col[0]|0},${col[1]|0},${col[2]|0}`;
+      ctx.strokeStyle = `rgba(${cs},${a})`;
       ctx.lineWidth = 1.4 * (1 - p) + 0.5;
       ctx.beginPath(); ctx.ellipse(rp.x, rp.y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
       const rx2 = rx * 0.55;                          // a trailing inner ring
       if (rx2 > 1.5) {
-        ctx.strokeStyle = `rgba(202,224,246,${a * 0.6})`;
+        ctx.strokeStyle = `rgba(${cs},${a * 0.6})`;
         ctx.beginPath(); ctx.ellipse(rp.x, rp.y, rx2, rx2 * 0.30, 0, 0, Math.PI * 2); ctx.stroke();
       }
     }
@@ -812,7 +831,7 @@
     ctx.clearRect(0, 0, W, H);
     drawSky(c);
     drawSea(t, c);
-    drawRipples(t);
+    drawRipples(t, c);
     drawBuildings(town.buildings, t, c);
     drawBoats(town.boats, t, c);
     drawLighthouse(town.lighthouse, t, c);

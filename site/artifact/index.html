@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the water finally <b>catches the hour</b>. Every ripple
-    &mdash; the ones <b>your touch</b> makes and the splash a <b>diving gull</b>
-    leaves &mdash; used to stay a cold moonlit blue. Now they <b>warm toward the
-    reddened dusk sky</b>, and glow <b>amber when they ride near the lighthouse</b>.
-    <b>Click the water</b> at dusk to see the rings catch fire.
+    <b>Last night:</b> the water gained <b>depth</b>. A <b>second boat</b> now drifts
+    in a <b>far lane near the horizon</b> &mdash; smaller, slower, and veiled in
+    <b>haze</b> so it reads as distant. It sails <b>behind the cottages</b> while the
+    near boat passes in front, so the harbor finally has near and far water, not one
+    flat plane.
   </p>
 
-  <footer>Night 9 &middot; founded 2026-06-02</footer>
+  <footer>Night 10 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -92,6 +92,27 @@
     offset: 240,                // starting position along the loop
     phase: 1.3,                 // its own bob/sway timing
   });
+
+  // ---- Night 10: a SECOND boat, far out near the horizon — the water gets DEPTH.
+  // For nine nights everything afloat shared one plane; now a smaller, slower,
+  // hazier boat drifts in a distant lane between the cottages and the headland.
+  // It moves at roughly half the near boat's speed (parallax: far things crawl),
+  // hugs the waterline, and is veiled by atmospheric haze so it reads as *far*,
+  // not merely small. Drawn BEHIND the cottages (see the two-pass render in
+  // `frame`) so the near boat and the town's waterline sit honestly in front.
+  town.boats.push({
+    baseY: town.horizon + 15,   // tucked just below the horizon — distant water
+    scale: 0.82,                // smaller, to sell the distance
+    speed: 0.013,              // ~2x slower than the near boat (parallax)
+    offset: 880,                // starts elsewhere along the loop
+    phase: 3.1,
+    far: true,                  // hazier, dimmer, and rendered behind the town
+  });
+
+  // Two lanes of water, drawn in two passes so depth z-orders correctly:
+  // the far lane goes down before the cottages, the near lane after them.
+  town.farBoats  = town.boats.filter(b => b.far);
+  town.nearBoats = town.boats.filter(b => !b.far);
 
   // ---- Night 2: a row of harbor cottages along the shore to the left. ----
   // Each cottage carries warm windows that light one-by-one after load — the
@@ -423,22 +444,31 @@
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
     for (const bt of list) {
       const range = W + 160;
+      const s = bt.scale;
+      const near = s / 1.7;                 // 1 for the original boat, <1 for the far one
+      // A distant boat is veiled by haze: drawn fainter so it sinks toward the
+      // sea behind it, and it rocks less (small motions read smaller far away).
+      const haze = bt.far ? 0.62 : 1;
       // Wrap across the scene: enters at the left, exits past the right.
       const x = -80 + (((t * bt.speed) + bt.offset) % range);
-      const bob = Math.sin(t * 0.0013 + bt.phase) * 4;     // gentle rise/fall
+      const bob = Math.sin(t * 0.0013 + bt.phase) * 4 * near;  // gentle rise/fall
       const y = bt.baseY + bob;
-      const tilt = Math.sin(t * 0.0011 + bt.phase) * 0.04;  // rocks on the swell
-      const s = bt.scale;
+      const tilt = Math.sin(t * 0.0011 + bt.phase) * 0.04 * near; // rocks on the swell
+
+      ctx.save();
+      ctx.globalAlpha = haze;
 
       // Lantern reflection cast straight down onto the water (world coords, so
-      // it stays vertical no matter how the hull rocks).
+      // it stays vertical no matter how the hull rocks). Its length tracks the
+      // boat's scale, so the far boat throws a correspondingly shorter glimmer.
       const lx = x + 24 * s;
-      const lwob = Math.sin(t * 0.0017 + bt.phase) * 2.6;
-      const rg = ctx.createLinearGradient(0, y, 0, y + 74);
+      const lwob = Math.sin(t * 0.0017 + bt.phase) * 2.6 * near;
+      const reflLen = 74 * near;
+      const rg = ctx.createLinearGradient(0, y, 0, y + reflLen);
       rg.addColorStop(0, `rgba(255,198,118,${0.42 * wl})`);
       rg.addColorStop(1, "rgba(255,198,118,0)");
       ctx.fillStyle = rg;
-      ctx.fillRect(lx - 4 + lwob, y, 8, 74);
+      ctx.fillRect(lx - 4 * near + lwob, y, 8 * near, reflLen);
 
       // Faint wake trailing behind the bow.
       ctx.strokeStyle = "rgba(170,195,225,0.12)";
@@ -500,7 +530,8 @@
       ctx.arc(24, -13, 2.3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.restore();
+      ctx.restore();        // end the hull transform
+      ctx.restore();        // end the haze veil
     }
   }
 
@@ -832,8 +863,9 @@
     drawSky(c);
     drawSea(t, c);
     drawRipples(t, c);
+    drawBoats(town.farBoats, t, c);        // far lane — sits BEHIND the cottages
     drawBuildings(town.buildings, t, c);
-    drawBoats(town.boats, t, c);
+    drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
     drawLighthouse(town.lighthouse, t, c);
     stepGulls(t, dt, c);
     drawGulls(t, c);

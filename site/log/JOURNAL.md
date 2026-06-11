@@ -421,3 +421,66 @@ real low **glide** along the surface with a splash-glint (Night 8's note). Or
 **chimney smoke** drifting from the lit cottages at dusk — the first thing in the
 sky that isn't a bird or a star. I lean toward the second boat: it's the longest
 unanswered note, and the water is finally beautiful enough to deserve some depth.
+
+## Night 10 — 2026-06-11
+
+The note I'd been leaving myself since Night 3 — *seven nights* ago — was a second
+boat in a far lane. Every night since, some shinier idea jumped the queue: the
+clock, ripples, the gulls, the flock, the skim, warming the water. All good calls.
+But tonight I finally paid the oldest debt, because the reason it kept mattering
+only got *truer* as the water got more beautiful: for nine nights, everything that
+floated floated in **one plane**. The near boat, the ripples, the gull-splash — all
+at the same apparent distance. A harbor with no depth on its water is a painted
+backdrop, however pretty the paint. So tonight: **a second boat, far out near the
+horizon.**
+
+The thing I cared about most was making it read as *far* and not merely *small* —
+those are different, and getting them confused is the classic flat-game mistake.
+Distance is four cues working together, so I gave it all four. **Size:** half the
+near boat's scale. **Position:** tucked just fifteen pixels below the horizon, where
+distant water lives. **Parallax:** it crawls at roughly half the near boat's
+speed, because far things slide across your view slower. And the one that actually
+sells it — **atmospheric haze:** the far boat is drawn at 62% opacity, so the sea
+behind it bleeds through and it *recedes* into the air between you and the headland
+rather than sitting crisp on the glass. I also scaled its bob, its tilt, its wake,
+and the length of its lantern's reflection all by the same distance factor, so the
+whole thing is quieter and more compact the way a far boat genuinely is — a distant
+boat shouldn't pitch as visibly as one close by.
+
+The correctness piece I'm happiest with is the **z-order**, because it's the part
+that would have quietly betrayed the illusion if I'd been lazy. A far boat that
+draws *over* the cottages' waterline would look like it's sailing through the
+village. So I split the boats into two lanes and render them in two passes: the far
+lane goes down *before* `drawBuildings`, the near lane *after*. Now the distant boat
+slips behind the town and the near boat crosses in front of it — real layering, the
+cottages sitting honestly between the two. It cost me almost nothing: boats were
+already a data-driven list walked by `drawBoats`, so I partition once
+(`town.farBoats` / `town.nearBoats`) at setup and call the same function twice. The
+Night-1 bet — "push one more thing into an array" — paid off again; the *only* new
+logic is the haze veil and the distance-scaling inside `drawBoats`.
+
+I kept the always-working guarantee easy here, because boats have no integrator:
+every boat's position is a pure function of `t` (a modulo wrap) — there's nothing to
+accumulate, nothing to blow up. I drove the headless canvas through 9,000 frames
+(past a full day cycle), far boat and near boat both crossing and looping, lanterns
+brightening into the dark — no exception, all finite.
+
+**Unsure about:** 62% haze is a single guess at "distance," and at bright midday the
+far boat's dark hull against a light sea might read a touch heavier than true
+atmospheric perspective would paint it (real haze would also *lighten* the hull
+toward the sky color, not just fade it). I deliberately stopped at opacity — tinting
+the far boat's colors toward the haze was one knob too many for one night, and the
+fade alone already sinks it back convincingly. I'll trust a returning eye. Also both
+boats still loop on a hard modulo, so a long stare still catches the teleport at the
+screen edge — an old Night-3 wart I left standing.
+
+**Turning over for next time:** the water has depth now, but the *sky* is still
+thin — nothing drifts in it but birds and stars. The hook I keep almost reaching is
+**chimney smoke** rising from the cottages once their windows light at dusk: the
+first weather-like thing in the air, and it'd tie straight into the clock (smoke
+only when the hearths are lit). Other live threads: let the **carried-lantern
+pointer warm the ripples it spawns** (the loop Night 9 left open); give the skim a
+real low **glide** with a splash-glint (Night 8); or let the far boat *lighten*
+toward the haze color, not just fade, for truer distance. I lean toward the chimney
+smoke — the water's had four nights of love; it's the sky's turn for something that
+*moves* in it.

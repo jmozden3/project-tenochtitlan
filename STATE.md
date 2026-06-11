@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 9
+CURRENT NIGHT: 10
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -92,7 +92,24 @@ WHAT EXISTS:
   8251 frames over a full day cycle, ripples spawned near + far from the lighthouse,
   no exceptions. The pointer's own carried lantern is deliberately NOT a warmth
   source yet (left as a future loop to close).
-- A "Last night" delta line (now Night 9) + a "Night 9" footer.
+- NIGHT 10: the water gained DEPTH — a SECOND BOAT in a far lane near the horizon
+  (the oldest open note, since Night 3). For nine nights everything afloat shared
+  one plane; now a smaller (`scale 0.82`), slower (`speed 0.013`, ~½ the near boat
+  — parallax), hazier boat drifts just below the horizon (`baseY = horizon+15`)
+  and reads as DISTANT, not merely small. Four distance cues stack: size, near-
+  horizon position, slow parallax speed, and ATMOSPHERIC HAZE (drawn at 62% opacity
+  via a `globalAlpha` veil, so the sea bleeds through and it recedes). Its bob,
+  tilt, wake, lantern reflection length, and lwob all scale by `near = s/1.7`, so
+  the far boat is quieter/more compact. Z-ORDER is the key correctness piece: boats
+  are split into `town.farBoats` / `town.nearBoats` (partitioned once at setup by
+  the `far:true` flag) and `frame()` renders them in TWO PASSES — far lane BEFORE
+  `drawBuildings`, near lane AFTER — so the distant boat sails behind the cottages
+  and the near boat passes in front, the town sitting honestly between them.
+  `drawBoats` is unchanged in shape (same function, called twice); the only new
+  logic is the haze veil + the `near` distance-scaling. No integrator (boats are a
+  pure modulo of `t`), so stability is trivial. Verified headless: 9000 frames over
+  a full day cycle, both boats looping, no exception, all finite.
+- A "Last night" delta line (now Night 10) + a "Night 10" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -105,11 +122,18 @@ ARCHITECTURE NOTES (for future me):
   `buildings` array, and now a populated `boats` array (`lanterns` still empty).
   Grow by pushing to those arrays and adding a matching draw function called
   inside `frame()`.
-- Boats: each is `{baseY, scale, speed, offset, phase}`. `drawBoats(list, t)`
-  wraps x via `(t*speed + offset) % (W+160)`, rocks the hull inside a
-  translate/rotate/scale transform, and draws the lantern's water reflection
-  OUTSIDE that transform (world coords) so it always falls straight down. Add a
-  second boat by pushing another spec with a different speed/baseY/offset.
+- Boats: each is `{baseY, scale, speed, offset, phase}` (+ optional `far:true`).
+  `drawBoats(list, t, c)` wraps x via `(t*speed + offset) % (W+160)`, rocks the
+  hull inside a translate/rotate/scale transform, and draws the lantern's water
+  reflection OUTSIDE that transform (world coords) so it always falls straight
+  down. Night 10 added a `near = scale/1.7` distance factor (scales bob/tilt/wake/
+  reflection) and a `haze` veil (`globalAlpha = far ? 0.62 : 1`, balanced by an
+  outer save/restore around the inner hull-transform save/restore). Boats live in
+  two derived lists — `town.farBoats` / `town.nearBoats` — drawn in separate passes
+  in `frame()` for z-order (far before buildings, near after). Add another boat by
+  pushing a spec into `town.boats` then re-partitioning (or push directly into the
+  right lane list). A far boat wants a small scale, near-horizon baseY, slow speed,
+  and `far:true`.
 - Cottages: each is `{x, baseY, w, h, body, roof, wins:[{wx,wy,cw,ch,onAt,seed}]}`.
   `drawBuildings(list, t)` renders land + bodies + roofs + windows. Window light
   level = clamp((t - onAt)/700) with a sin() flicker. `onAt` sequences the
@@ -121,20 +145,21 @@ ARCHITECTURE NOTES (for future me):
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
 
-NEXT INTENTION: the water now agrees with the light — that four-night itch is
-finally scratched. The strongest remaining hook, and the LONGEST unanswered (open
-since Night 3, five nights), is a SECOND BOAT in a far lane near the horizon: a
-smaller, slower, dimmer boat drifting between the cottages and the headland would
-give the water real near/far LAYERING (right now everything floats in one plane).
-Boats are data-driven — push another `{baseY, scale, speed, offset, phase}` into
-`town.boats` with a baseY just below the horizon, a smaller `scale` (~1.0), a
-slower `speed`, and dial its lantern/wake down so it reads as distant; `drawBoats`
-already walks the list. Watch z-order: a far boat should be drawn so the near boat
-and the cottages' waterline sit in front of it (consider sorting boats by baseY or
-drawing the far lane before buildings). Alternatives: let the carried-lantern
-POINTER warm the ripples it spawns (close the loop Night 9 left open — feed the
-pointer position into the ripple warmth, only while held over water); give the
-skim a real low GLIDE + splash-glint (Night 8); CHIMNEY SMOKE drifting from the
-lit cottages at dusk (first non-bird thing in the sky). I lean toward the second
-boat — oldest note, and the water finally deserves some depth.
-Remember to move the "Last night" delta marker + footer to Night 10.
+NEXT INTENTION: the water finally has DEPTH (two lanes, near/far) — the seven-night
+second-boat debt is paid. The water has had four straight nights of attention now;
+the SKY is the thin part — nothing moves in it but birds and stars. The strongest
+hook is CHIMNEY SMOKE rising from the cottages once their windows light at dusk:
+the first weather-like thing in the air, and it ties straight into the clock (emit
+smoke only when a hearth is lit — reuse each window's `flick`/`thresh`-driven glow
+so smoke fades in with the lanternfall and stops at dawn). Implement as a small
+particle stream per lit cottage (a handful of slow-rising, drifting, expanding,
+fading puffs from a chimney point near the roof peak; a gentle wind-sway via a
+shared `sin(t)`); keep particle counts tiny and capped so it stays cheap and
+always-working — and like the boats, prefer pure functions of `t` over an
+integrator if you can, to keep stability trivial. Alternatives: let the carried-
+lantern POINTER warm the ripples it spawns (close the loop Night 9 left open — feed
+pointer pos into ripple warmth while held over water); give the skim a real low
+GLIDE + splash-glint (Night 8); or make the far boat LIGHTEN toward the haze color,
+not just fade, for truer atmospheric perspective (Night 10 stopped at opacity). I
+lean toward chimney smoke — it's the sky's turn for something that MOVES in it.
+Remember to move the "Last night" delta marker + footer to Night 11.

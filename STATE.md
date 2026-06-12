@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 10
+CURRENT NIGHT: 11
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -109,7 +109,24 @@ WHAT EXISTS:
   logic is the haze veil + the `near` distance-scaling. No integrator (boats are a
   pure modulo of `t`), so stability is trivial. Verified headless: 9000 frames over
   a full day cycle, both boats looping, no exception, all finite.
-- A "Last night" delta line (now Night 10) + a "Night 10" footer.
+- NIGHT 11: the SKY got WEATHER — CHIMNEY SMOKE, the first moving thing in the air
+  besides birds/stars. Each cottage now has a small chimney stack (solved flush onto
+  the roof's right slope at setup: `chim = {x, baseY, h, seed}` pushed into the
+  building spec) and emits a thin plume once its hearth lights. Smoke is gated on the
+  SAME trigger as the lanternfall: `hearth = ss(wins[0].thresh±0.06, c.nightness)` —
+  the very window-glow that lights the row — so plumes fade in COLUMN BY COLUMN down
+  the row as the windows sequence on, and stop again at dawn (verified: 0 smoking at
+  midday, 9 at dusk + night). Each chimney emits PUFFS=5 capped puffs; every puff is a
+  PURE FUNCTION of t — `p = (t*RATE + i/PUFFS + seed*0.11) % 1` (0 fresh → 1 spent) —
+  and rises (`p*RISE`, RISE=84), swells (`2.2+7.5p`), sways (`sin`), leans on a shared
+  two-term wind gust, and fades via `sin(πp)` (up from nothing, back to nothing, no
+  pop). No state, no integrator → trivially stable like the boats. Smoke catches the
+  hour (`lerpC([150,160,182],[205,184,165], c.dusk)`): cool grey by night, dusty amber
+  through dusk. Lives in `drawSmoke(town.buildings, t, c)`, called in `frame()` right
+  AFTER `drawBuildings` (so plumes layer above rooftops, below the gulls). Verified
+  headless: 7813 frames over a full day cycle, no exception, all gradient alphas finite
+  and in [0,1].
+- A "Last night" delta line (now Night 11) + a "Night 11" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -144,22 +161,31 @@ ARCHITECTURE NOTES (for future me):
 - Cottage windows are no longer time-based; each has a `thresh` and lights when
   `c.nightness` crosses it (see `drawBuildings`). The lanternfall now happens at
   every dusk and reverses at dawn — driven entirely by the clock.
+- Smoke (Night 11): each building now also carries a `chim = {x, baseY, h, seed}`
+  (a roof-slope point + stack height, computed in the seeding IIFE). `drawBuildings`
+  draws the stack; `drawSmoke(list, t, c)` draws the plume, gated on the cottage's
+  first-window glow so it rides the lanternfall. Puffs are pure functions of `t` —
+  to add wind turbulence give each chimney its own wind phase; to make smoke
+  interact, read the gulls/beam where a plume rises. Tuning is the `PUFFS/RISE/RATE`
+  locals + the wind expression at the top of `drawSmoke`.
 
 NEXT INTENTION: the water finally has DEPTH (two lanes, near/far) — the seven-night
-second-boat debt is paid. The water has had four straight nights of attention now;
-the SKY is the thin part — nothing moves in it but birds and stars. The strongest
-hook is CHIMNEY SMOKE rising from the cottages once their windows light at dusk:
-the first weather-like thing in the air, and it ties straight into the clock (emit
-smoke only when a hearth is lit — reuse each window's `flick`/`thresh`-driven glow
-so smoke fades in with the lanternfall and stops at dawn). Implement as a small
-particle stream per lit cottage (a handful of slow-rising, drifting, expanding,
-fading puffs from a chimney point near the roof peak; a gentle wind-sway via a
-shared `sin(t)`); keep particle counts tiny and capped so it stays cheap and
-always-working — and like the boats, prefer pure functions of `t` over an
-integrator if you can, to keep stability trivial. Alternatives: let the carried-
-lantern POINTER warm the ripples it spawns (close the loop Night 9 left open — feed
-pointer pos into ripple warmth while held over water); give the skim a real low
-GLIDE + splash-glint (Night 8); or make the far boat LIGHTEN toward the haze color,
-not just fade, for truer atmospheric perspective (Night 10 stopped at opacity). I
-lean toward chimney smoke — it's the sky's turn for something that MOVES in it.
-Remember to move the "Last night" delta marker + footer to Night 11.
+second-boat debt is paid, and the SKY now has its first moving weather (chimney
+smoke). The systems are getting rich; the strongest next move is INTERACTION that
+closes an open loop. The lean is the CARRIED-LANTERN POINTER warming the ripples it
+spawns: Night 9 deliberately left the pointer out of `drawRipples`' warmth sources
+(only the dusk sky + the lighthouse warm a ring today). Close it — when a ripple is
+born under/near the hovering `pointer` while it's over water, add a pointer-warmth
+term so the visitor's own carried light finally tints the rings it makes. Cleanest
+approach: stamp each ripple with the pointer's warmth contribution AT SPAWN (the
+pointer moves while the ripple sits, so don't recompute against live pointer pos
+each frame — capture it once in `spawnRipple` and store it on the ripple, then add
+it into `warmth` in `drawRipples`). It's small, surgical, and finishes a door I
+left ajar two nights ago. Alternatives: give the skim a real low GLIDE + splash-
+glint (Night 8); add WIND TURBULENCE to the smoke (a per-chimney wind phase — its
+own loose end, the plumes currently march in lockstep); make smoke INTERACT (a
+roosting gull beside a smoking chimney, or the beam catching a plume); or make the
+far boat LIGHTEN toward the haze color, not just fade (Night 10). I lean toward the
+pointer-warmth loop — it's the oldest unscratched itch and it makes the water catch
+the visitor's light, not just the sky's and the lamp's.
+Remember to move the "Last night" delta marker + footer to Night 12.

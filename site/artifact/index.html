@@ -54,14 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the water gained <b>depth</b>. A <b>second boat</b> now drifts
-    in a <b>far lane near the horizon</b> &mdash; smaller, slower, and veiled in
-    <b>haze</b> so it reads as distant. It sails <b>behind the cottages</b> while the
-    near boat passes in front, so the harbor finally has near and far water, not one
-    flat plane.
+    <b>Last night:</b> the sky gained its first <b>weather</b>. <b>Chimney smoke</b>
+    now rises from each cottage the moment its hearth lights at dusk &mdash; thin
+    plumes that drift, swell, and lean together on a slow <b>wind</b>, fading in
+    down the row with the lanternfall and dying out again at dawn.
   </p>
 
-  <footer>Night 10 &middot; founded 2026-06-02</footer>
+  <footer>Night 11 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -142,7 +141,14 @@
         wins.push({ wx, wy, cw, ch, thresh: 0.30 + order * 0.045, seed: order });
         order++;
       }
-      town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins });
+      // Night 11: a small CHIMNEY on the roof's right slope — the source of the
+      // smoke that rises once this cottage's hearth (its windows) lights at dusk.
+      // Its base is solved onto the roof line so the stack sits flush on the pitch.
+      const top = baseY - h, peakY = top - h * 0.34;
+      const cxOff = w * 0.22, fr = cxOff / (w / 2 + 3);   // 0 at peak .. 1 at eave
+      const chim = { x: x + cxOff, baseY: peakY + fr * (top - peakY),
+                     h: Math.max(8, h * 0.22), seed: town.buildings.length };
+      town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins, chim });
     }
   })();
 
@@ -407,6 +413,12 @@
       ctx.closePath();
       ctx.fill();
 
+      // Night 11: the chimney stack — smoke rises from its top once the hearth lights.
+      if (b.chim) {
+        ctx.fillStyle = b.roof;
+        ctx.fillRect(b.chim.x - 2.6, b.chim.baseY - b.chim.h, 5.2, b.chim.h + 3);
+      }
+
       // Windows, each lighting in turn then flickering softly.
       for (const win of b.wins) {
         const glow = ss(win.thresh - 0.06, win.thresh + 0.06, c.nightness);
@@ -435,6 +447,50 @@
           ctx.fillStyle = rg;
           ctx.fillRect(hx - 3 + wob, town.horizon, 6, 46);
         }
+      }
+    }
+  }
+
+  // ---- Night 11: CHIMNEY SMOKE — the first weather-like thing in the air. Once a
+  // cottage's hearth lights at dusk (gated on the very window-glow that drives the
+  // lanternfall), a thin plume rises from its chimney: a handful of slow, drifting,
+  // expanding, fading puffs that lean together on a shared wind. Each puff is a PURE
+  // FUNCTION of t (a looping progress 0→1) — no integrator, nothing to accumulate or
+  // destabilize, so stability is trivial like the boats. Because the trigger is the
+  // window glow, smoke fades in column-by-column down the row as the lanternfall
+  // sweeps through, and stops again at dawn — it keeps the clock's hours like the lights.
+  function drawSmoke(list, t, c) {
+    const PUFFS = 5;                       // tiny + capped per chimney, so it stays cheap
+    const RISE = 84;                       // how high a puff climbs over its life (px)
+    const RATE = 0.000046;                 // puff lifecycle speed → ~22s per puff
+    // A shared, slow wind so every column leans the same way (a gust + a finer ripple).
+    const wind = Math.sin(t * 0.00012) * 0.55 + Math.sin(t * 0.00041) * 0.18;
+    // Smoke catches the hour: cool grey by night, a touch warm through dusk.
+    const col = lerpC([150,160,182], [205,184,165], c.dusk);
+    const cs = `${col[0]|0},${col[1]|0},${col[2]|0}`;
+    for (const b of list) {
+      if (!b.chim) continue;
+      // Hearth lit-ness = this cottage's window glow — the exact lanternfall trigger.
+      const w0 = b.wins[0];
+      const hearth = ss(w0.thresh - 0.06, w0.thresh + 0.06, c.nightness);
+      if (hearth < 0.02) continue;
+      const ox = b.chim.x, oy = b.chim.baseY - b.chim.h - 1;   // the chimney top
+      for (let i = 0; i < PUFFS; i++) {
+        const seed = b.chim.seed * 1.7 + i * 1.618;
+        const prog = (t * RATE + i / PUFFS + b.chim.seed * 0.11) % 1;   // 0 fresh .. 1 spent
+        const rise = prog * RISE;
+        const sway = Math.sin(prog * 3.1 + seed * 6.283) * (2 + prog * 9);
+        const x = ox + sway + wind * rise;                    // drifts, then leans downwind
+        const y = oy - rise;
+        const rad = 2.2 + prog * 7.5;                          // puffs swell as they climb
+        const fade = Math.sin(prog * Math.PI);                 // up from nothing, back to nothing
+        const a = fade * 0.12 * hearth;
+        if (a < 0.004) continue;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        g.addColorStop(0, `rgba(${cs},${a})`);
+        g.addColorStop(1, `rgba(${cs},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
       }
     }
   }
@@ -865,6 +921,7 @@
     drawRipples(t, c);
     drawBoats(town.farBoats, t, c);        // far lane — sits BEHIND the cottages
     drawBuildings(town.buildings, t, c);
+    drawSmoke(town.buildings, t, c);       // Night 11 — plumes rise from lit hearths
     drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
     drawLighthouse(town.lighthouse, t, c);
     stepGulls(t, dt, c);

@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the sky gained its first <b>weather</b>. <b>Chimney smoke</b>
-    now rises from each cottage the moment its hearth lights at dusk &mdash; thin
-    plumes that drift, swell, and lean together on a slow <b>wind</b>, fading in
-    down the row with the lanternfall and dying out again at dawn.
+    <b>Last night:</b> the water now catches <b>your</b> light. Tap or drag the sea
+    near your cursor's <b>carried lantern</b> and the ripples you make glow warm with
+    it &mdash; the visitor's own light finally joins the dusk sky and the lighthouse
+    in tinting the rings, closing a loop left open three nights ago.
   </p>
 
-  <footer>Night 11 &middot; founded 2026-06-02</footer>
+  <footer>Night 12 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -224,9 +224,22 @@
   function spawnRipple(x, y, s) {
     if (y < town.horizon + 2) return;
     if (ripples.length > 60) ripples.shift();
-    ripples.push({ x, y, t0: performance.now(), s });
+    // Night 12: the visitor carries a lantern (drawPointer). If this ring is born
+    // under/near that hovering glow while it's over water, STAMP its warmth now —
+    // the pointer drifts on while the ripple sits, so capture the contribution at
+    // BIRTH rather than chasing the live pointer each frame. drawRipples folds `pw`
+    // into the warmth it already gets from the dusk sky and the lighthouse.
+    let pw = 0;
+    if (pointer.inside && pointer.y > town.horizon) {
+      pw = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / 150);
+    }
+    ripples.push({ x, y, t0: performance.now(), s, pw });
   }
-  canvas.addEventListener("pointerdown", e => { const p = toScene(e); spawnRipple(p.x, p.y, 1); startleGulls(p.x, p.y); });
+  canvas.addEventListener("pointerdown", e => {
+    const p = toScene(e);
+    pointer.x = p.x; pointer.y = p.y; pointer.inside = true;   // the carried light is here now,
+    spawnRipple(p.x, p.y, 1); startleGulls(p.x, p.y);          // so the click's own ring catches it
+  });
   canvas.addEventListener("pointerleave", () => { pointer.inside = false; });
   canvas.addEventListener("pointermove", e => {
     const p = toScene(e);
@@ -686,6 +699,11 @@
   // reddened dawn/dusk sky warms every ripple, and a ring that rides near the
   // lighthouse's pooled glow takes on its amber — strongest after dark when the
   // lamp matters most. The water finally agrees with the sky and the lights above.
+  // ---- Night 12: a THIRD warmth source — the visitor's own carried lantern. Each
+  // ripple was stamped at birth with `pw` (its nearness to the hovering pointer-glow
+  // over water; see spawnRipple), so a ring you tap out right under your cursor now
+  // glows with the light YOU carry, not only the sky's and the lighthouse's. Closes
+  // the loop Night 9 deliberately left open.
   function drawRipples(t, c) {
     const LIFE = 2600;
     // Cool moonlit tone the rings rest at (a touch brighter by day) ↔ warm catch.
@@ -708,7 +726,8 @@
       // the lighthouse's glow warms it further (and only really at night).
       const ddx = rp.x - lhx, ddy = rp.y - lhy;
       const near = Math.max(0, 1 - Math.hypot(ddx, ddy) / 240) * lamp;
-      const warmth = Math.min(1, c.dusk * 0.8 + near * 0.9);
+      // …and the visitor's carried lantern, stamped at birth (Night 12).
+      const warmth = Math.min(1, c.dusk * 0.8 + near * 0.9 + rp.pw * 0.7);
       const col = lerpC(cool, warm, warmth);
       const cs = `${col[0]|0},${col[1]|0},${col[2]|0}`;
       ctx.strokeStyle = `rgba(${cs},${a})`;

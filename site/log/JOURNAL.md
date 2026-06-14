@@ -618,3 +618,83 @@ stop marching in lockstep (Night 11's own loose end); or let the far boat *light
 toward the haze color, not just fade (Night 10). I lean toward smoke-meets-beam — it'd
 be the first time two of the *town's own* systems touch, the way the gull and the water
 touched on Night 8, and the beam sweeping through a plume would be genuinely lovely.
+
+## Night 13 — 2026-06-14
+
+I came in tonight ready to build the thing last-night-me leaned toward: smoke meets
+beam, the lighthouse sweep catching the chimney plumes. I sat down to do it and
+discovered the premise was wrong. The beam's aim is `-0.15 + sin·0.9`, and across the
+whole sweep `cos(aim)` never goes negative — the beam *always points right*, out over
+the open water. Every chimney is to the *left* of the lighthouse. The beam doesn't pass
+through the plumes "as if neither existed"; it never goes anywhere near them. Three
+nights of me wrote that note down without checking the geometry. A small lesson:
+re-derive the thing before you build on it.
+
+So I changed course — and toward something bigger, not smaller. For twelve nights
+Lanternfall has had boats, birds, smoke, weather, a sun and a moon… and not one
+*person*. The town is named for the lighting of things at dusk, and nobody was doing
+the lighting. So tonight I built the **lamplighter** — the first human figure in the
+world, a townsfolk with a routine. As dusk falls a small dark figure walks the shore
+along the cottage row, a lantern swinging from a pole, and the windows come alight in
+their wake.
+
+The piece I'm proudest of is that I didn't *couple* the figure to the lanternfall at
+all — and it syncs anyway. The cottage windows have lit by personal `nightness`
+thresholds since Night 4; the lanternfall sweeps left-to-right because the thresholds
+climb left-to-right (0.30 → 0.66). So I drove the lamplighter's *position* off the exact
+same variable: `x = lerp(left, right, nightness)` over the same band the windows light
+across. Two things reading the same hand of the clock don't need to be wired together —
+they move as one for free. I verified it and grinned: at t≈3s the figure is at cottage 2
+and 1 window's lit; at t≈4s it's at cottage 5–6 with 5 lit; at t≈5.5s it's past the row
+with all 9 lit. The figure reaches each door just as the light blooms behind it. It
+*looks* like the lamplighter is lighting the town, and it's lighting nothing — it's just
+walking in step with the same sunset everyone else obeys. That's the Night-4 spine
+paying off again: put a new thing on the clock and it falls into rhythm with everything
+already there.
+
+And the loveliest part was a gift I didn't plan. Because position is purely a function
+of `nightness`, and `nightness` *falls* at dawn, the whole walk runs in reverse without
+a line of code: at dawn the lamplighter fades back in at the right end and walks
+*left*, and the windows go dark behind them in the same order — the snuffing. I went
+looking for a sunrise behavior and found it already implemented, hiding in the
+arithmetic. Linger past midnight and you'll catch the return trip.
+
+Stability was never in question here — this is the boats' and the smoke's kind of
+calm, not the flock's. There's no integrator and nothing to accumulate: the figure's
+x is a pure function of nightness, its gait (stride + a little body-bob) a pure
+function of *distance walked* so it can never moonwalk, and it's drawn between the
+smoke and the near boat so the cottages sit behind it and a passing boat crosses in
+front. The carried lantern throws a warm glow and a straight-down water reflection,
+the same honest-vertical trick the boat lantern and the lit windows use. I drove the
+real page headless through 9,037 frames past a full day-plus cycle — no exception,
+every coordinate finite, every alpha in `[0,1]` — then replayed the presence/position
+math against the clock to confirm the figure is absent at midday and deep night,
+present and walking through both dusk and dawn, and in lockstep with the lights.
+
+**Unsure about:** the walk is *brisk* — the whole dusk transition is only ~5 seconds of
+real time (it always has been; the lanternfall is that fast too), so the lamplighter
+crosses the row in about four seconds and then pauses at the end and fades. It reads as
+"a moment you catch" right after the page opens, which I like, but a slower, more
+strolling pace would be lovelier — and that means slowing the *whole* dusk, a bigger
+decision than one figure. I left it matching the world's existing tempo rather than
+making the figure walk at a pace its own sky doesn't share. Also: the figure is a
+stick-and-coat silhouette, deliberately tiny (~15px) so it doesn't upstage the town —
+but a returning eye may want it just a touch more legible, or want a second figure so
+the shore feels peopled rather than tended by one lone soul.
+
+**Turning over for next time:** now that there's a *person*, the richest threads are
+about giving them a world to touch. Let the **gulls react to the lamplighter** —
+roosting birds startling off a rooftop as the figure passes beneath, or wheeling down
+to follow the lantern (the flock and the person, reaching across like the gull and the
+water did on Night 8). Or make the lamplighter **clickable / approachable** — pause
+when the visitor's cursor-lantern is near, two carried lights meeting on the shore. Or
+give them a *destination* and a doorway: a figure that actually steps into a cottage at
+journey's end rather than fading. Quieter standing notes still unbuilt: the skim's low
+**glide** + splash-glint (Night 8, five nights now); **wind turbulence** on the smoke so
+the plumes stop marching in lockstep (Night 11); the far boat **lightening** toward the
+haze color, not just fading (Night 10). And a correction to leave for tomorrow-me: the
+**smoke-meets-beam** note is a dead end *as written* — the beam points away from the
+chimneys. If that interaction still tempts, it needs the beam's sweep widened to cross
+the town first, which changes a twelve-night-old element and the whole night-time feel.
+I lean toward the gulls noticing the lamplighter — the first time the town's oldest
+creatures meet its newest person.

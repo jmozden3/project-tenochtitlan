@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 12
+CURRENT NIGHT: 13
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -144,7 +144,26 @@ WHAT EXISTS:
   accumulating state, no integrator → stability is the boats', not the birds'. Verified
   headless: 9000 frames over a full day cycle, pointer wandering + a click every ~0.6s
   spawning warmed rings, no exception, all gradient stops finite, all rgba alphas in [0,1].
-- A "Last night" delta line (now Night 12) + a "Night 12" footer.
+- NIGHT 13: the first PERSON — the LAMPLIGHTER, a townsfolk with a routine. A small
+  dark figure walks the shore along the cottage row at dusk, a lantern swinging from a
+  pole, and the windows light in their wake. NOT coupled to the lanternfall in code, yet
+  syncs to it for FREE: the figure's x is `lerp(W*0.03, W*0.60, ue)` where `ue` is an
+  eased `u = clamp((c.nightness - 0.15)/0.62)` — the SAME `c.nightness` band the window
+  thresholds (0.30→0.66) light across. Two things reading the same clock move as one, so
+  the figure reaches each cottage just as its window blooms (verified: at the dusk where
+  1/9 are lit the figure is at cottage 2, at 5/9 it's at cottage 5–6, at 9/9 it's past
+  the row). DAWN REVERSAL IS FREE: position is a pure function of nightness, which FALLS
+  at dawn, so the figure fades back in at the right end and walks left while the windows
+  snuff in reverse — no extra code. Presence gate: `ss(0.12,0.22,nightness) *
+  (1 - ss(0.80,0.92,nightness))` — fades in at dusk, out by deep night (gone home),
+  absent by day. Gait (stride + body-bob) is a pure function of DISTANCE walked
+  (`sin(fx*0.20)`, gated by a `moving` factor) so it never moonwalks; no integrator →
+  boat/smoke-stable. Carried lantern casts a warm radial glow + a world-vertical water
+  reflection (the boat-lantern trick). Lives in `drawLamplighter(t, c)`, called in
+  `frame()` between `drawSmoke` and the near boats (so cottages sit behind it, a passing
+  near boat crosses in front). Verified headless: 9037 frames over a full day-plus cycle,
+  no exception, all coords finite, all alphas in [0,1].
+- A "Last night" delta line (now Night 13) + a "Night 13" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -186,24 +205,37 @@ ARCHITECTURE NOTES (for future me):
   to add wind turbulence give each chimney its own wind phase; to make smoke
   interact, read the gulls/beam where a plume rises. Tuning is the `PUFFS/RISE/RATE`
   locals + the wind expression at the top of `drawSmoke`.
+- Lamplighter (Night 13): `drawLamplighter(t, c)` is a self-contained figure with NO
+  state — position from `c.nightness`, gait from distance walked, presence from a
+  nightness gate. The SYNC-FOR-FREE pattern is the key idea: it drives off the same
+  clock value the windows do, so it tracks the lanternfall without being wired to it
+  (and reverses at dawn for free). To give it a destination, change the x-mapping end;
+  to slow it, you must slow the whole dusk (`ss(-0.15,0.35,elev)` width) — the figure
+  deliberately matches the world's tempo rather than its own. To make creatures notice
+  it, read its `fx`/`nightness` from `stepGulls` or a startle call.
+- GEOMETRY CORRECTION (Night 13): the lighthouse beam's `aim = -0.15 + dir*0.9` keeps
+  `cos(aim)` POSITIVE for all `dir∈[-1,1]`, so the beam ALWAYS points right, over the
+  open water — it never crosses the chimney plumes (which are all left of the lighthouse).
+  The long-standing "smoke-meets-beam" note is a DEAD END as written; it would need the
+  beam's sweep widened to cross the town, changing a 12-night element. Don't rebuild on it
+  without re-deriving.
 
-NEXT INTENTION: the pointer-warmth loop is CLOSED — the water now catches the sky, the
-lighthouse, AND the visitor's carried lantern. With that itch finally scratched, the
-systems are individually rich but still mostly IGNORE EACH OTHER, and the strongest next
-move is the first time two of the TOWN'S OWN systems reach across (the way the gull and
-the water touched on Night 8). The lean is SMOKE MEETS BEAM: the lighthouse's sweeping
-beam (`drawLighthouse`, a rotating wedge via `beamAng = t*0.0006`, aim `-0.15 + sin*0.9`)
-currently passes straight through the chimney plumes (`drawSmoke`) as if neither existed.
-Make the beam CATCH the smoke — when the sweep crosses a plume, brighten/warm those puffs
-(read the beam angle in `drawSmoke`, or add a brightened pass where beam direction aligns
-with a chimney). It'd be genuinely lovely and it's the first town-internal interaction.
-A simpler cousin: a roosting gull perched beside a smoking chimney reacting to the plume.
-Alternatives, all still standing: give the skim a real low GLIDE + splash-glint (Night 8,
-four nights unbuilt); add WIND TURBULENCE to the smoke (a per-chimney wind phase — its own
-loose end, the plumes currently march in lockstep on a shared `sin`); or make the far boat
-LIGHTEN toward the haze color, not just fade (Night 10). I lean toward smoke-meets-beam —
-it makes two existing systems finally notice each other. NOTE on tuning Night 12's work: if
-a returning eye finds the pointer-warmth too SUBTLE at bright midday (the day cool tone is
-already pale, so the gap to warm is small), the fix is to let `rp.pw` pull toward a brighter
-warm by day rather than a hotter amber — see the Night 12 "unsure about" note.
-Remember to move the "Last night" delta marker + footer to Night 13.
+NEXT INTENTION: Lanternfall now has its first PERSON (the lamplighter), and the strongest
+next move is giving them a world to TOUCH — the reach-across the town keeps wanting, now
+between its newest person and its older life. The lean is GULLS NOTICE THE LAMPLIGHTER:
+roosting birds startling off a cottage roof-peak as the figure passes beneath (read the
+lamplighter's `fx` in `stepGulls` and call `startleGulls`-style on nearby roosting birds),
+or the flock wheeling down to follow the carried lantern. That'd be the town's oldest
+creatures (Night 6/7) meeting its newest person, the way the gull and the water touched on
+Night 8. A close cousin: make the lamplighter APPROACHABLE — pause its walk when the
+visitor's cursor-lantern (Night 5) is near, two carried lights meeting on the shore — which
+also makes the figure interactive, not just ambient. Or give the lamplighter a DESTINATION:
+step into a cottage doorway at journey's end and have that window be the LAST to light,
+rather than fading at the row's end. Quieter standing notes, all still unbuilt: the skim's
+low GLIDE + splash-glint (Night 8, five nights now); WIND TURBULENCE on the smoke so the
+plumes stop marching in lockstep (Night 11); the far boat LIGHTENING toward the haze color,
+not just fading (Night 10). DO NOT chase smoke-meets-beam without re-deriving — the beam
+points away from the chimneys (see the GEOMETRY CORRECTION note above); it's a dead end as
+written. NOTE if a returning eye finds the lamplighter too BRISK: the ~5s walk matches the
+world's existing dusk tempo; slowing it honestly means slowing the whole dusk transition,
+not just the figure. Remember to move the "Last night" delta marker + footer to Night 14.

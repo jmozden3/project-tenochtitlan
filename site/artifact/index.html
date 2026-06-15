@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the town got its first <b>person</b> &mdash; a <b>lamplighter</b>
-    who walks the shore at dusk with a lantern on a pole, and the cottage windows light
-    in their wake. Linger and watch: at dawn they walk back the other way, and the lights
-    go out behind them.
+    <b>Last night:</b> the <b>gulls notice the lamplighter</b> &mdash; a roosting bird now
+    <b>startles off the rooftop</b> as the figure passes beneath it. The town's oldest
+    creatures meet its newest person. Watch at <b>dawn</b>: the gulls are still asleep on
+    the roofs as the lamplighter walks home, so it flushes them off one by one.
   </p>
 
-  <footer>Night 13 &middot; founded 2026-06-02</footer>
+  <footer>Night 14 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -189,6 +189,7 @@
         flapRate: 0.85 + rnd(4) * 0.5,
         air: 0, scatterX: 0, scatterY: 0, startle: 0,
         skim: null,                 // Night 8: set when this bird peels off to skim the sea
+        spookArmed: true,           // Night 14: ready to startle when the lamplighter passes beneath
       });
     }
   })();
@@ -519,17 +520,21 @@
   // position is a pure function of nightness, gait a pure function of distance walked,
   // so stability is the boats'/smoke's, not the flock's. The carried lantern casts a
   // warm glow + a vertical water reflection, like every other light in this town.
+  // Night 14: its live position is published to `lamplighter` so the gulls can
+  // notice it pass beneath them (read in stepGulls — drawLamplighter runs first).
+  const lamplighter = { active: false, x: 0, y: 0 };
   function drawLamplighter(t, c) {
     // Present only while the town is lighting/snuffing: fades in at dusk, out by deep
     // night (gone home), absent by day. At dawn it fades back in and reverses for free.
     const presence = ss(0.12, 0.22, c.nightness) * (1 - ss(0.80, 0.92, c.nightness));
-    if (presence < 0.02) return;
+    if (presence < 0.02) { lamplighter.active = false; return; }
     // Walk the row: x tracks nightness over the same band the windows light across,
     // so the figure sweeps past each cottage as its threshold is crossed.
     const u = Math.max(0, Math.min(1, (c.nightness - 0.15) / 0.62));
     const ue = u * u * (3 - 2 * u);                  // ease the start and the stop
     const fx = lerp(W * 0.03, W * 0.60, ue);         // 0.60W stays on the spit, past the last cottage
     const fy = town.horizon + 13;                    // on the spit, at the waterline
+    lamplighter.active = true; lamplighter.x = fx; lamplighter.y = fy;
 
     // Gait advances with DISTANCE walked (never moonwalks), and only while moving —
     // parked at either end of the band the figure just stands and the lantern fades.
@@ -877,6 +882,28 @@
     // Occasionally send a bird down to skim the sea.
     skimTimer -= dt;
     if (skimTimer <= 0) { tryStartSkim(c); skimTimer = SKIM.every + Math.random() * SKIM.jitter; }
+
+    // ---- Night 14: the gulls NOTICE the lamplighter. When the figure (Night 13)
+    // walks beneath a roosting gull, the bird startles off its roof and lifts toward
+    // the flock — the town's oldest creatures meeting its newest person, a reach-across
+    // like the gull skimming the sea on Night 8. It reuses the very startle a click
+    // triggers, but armed ONCE per pass so a lingering figure can't pin a bird aloft;
+    // it re-arms once the lamplighter has moved well past. The timing is a gift of the
+    // shared clock: at dawn the gulls are still fully roosted as the lamplighter walks
+    // home snuffing the lights, so it flushes them off the rooftops one by one.
+    if (lamplighter.active) {
+      for (const g of gulls) {
+        const gap = Math.abs(g.home.x - lamplighter.x);
+        if (gap < 32 && g.air < 0.3 && g.spookArmed) {
+          g.startle = Math.max(g.startle, 1300);
+          g.scatterY -= 42;                                     // a startled bolt upward
+          g.scatterX += g.home.x < lamplighter.x ? -34 : 34;    // and shy away from the figure
+          g.spookArmed = false;
+        } else if (gap > 80) {
+          g.spookArmed = true;                                  // re-arm once it's well clear
+        }
+      }
+    }
 
     // Pass 1: from each bird's neighbours, build a desired flight direction.
     for (const g of gulls) {

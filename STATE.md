@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 14
+CURRENT NIGHT: 15
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -182,7 +182,27 @@ WHAT EXISTS:
   down). Verified headless: 18,000 frames over 2.4 day cycles, 0 exceptions, all coords
   finite, all rgba alphas in [0,1], lamplighter present 1775 frames, 4 startles fired —
   every one on a bird with air<0.3 (genuinely roosting), none on a flying bird.
-- A "Last night" delta line (now Night 14) + a "Night 14" footer.
+- NIGHT 15: the lamplighter is APPROACHABLE — the first time a PERSON in Lanternfall
+  acknowledges the visitor. Since Night 5 the cursor carries its own warm lantern-glow
+  (`drawPointer`); since Night 13 the lamplighter carries one too; now the two MEET.
+  Bring the cursor near the walking figure and it STOPS, raises its lantern, and reaches
+  it toward your glow (two carried lights on the shore); move away and it resumes its
+  rounds. The figure's position is a pure function of `nightness` (Night 13), which has no
+  memory, so a true pause needed exactly one number of state: `lamplighter.attend` (0→1,
+  eased toward the pointer's nearness using the `dt` now threaded into `drawLamplighter`).
+  While `attend≈0` the figure tracks the clock as before; the moment the cursor approaches,
+  `heldX` freezes where it stood and the drawn x blends from the clock position toward
+  `heldX`. When the cursor leaves, x GLIDES back to where the clock has since moved — a
+  smooth catch-up, so a brief pause never visibly desyncs it from the lit row. Greeting =
+  gait stills (stride/bob scale by `1-att`), lantern lifts (`lampY -= att*7`) and reaches
+  toward the cursor (`lampX += att*9*dirToP`), glow brightens/widens; the arm + water
+  reflection follow for free (already drawn to the lamp's point). Approach radius 96px;
+  presence still rides `nightness` so the figure goes home on schedule regardless (can't
+  be pinned). Stability is the boats'/smoke's: `att∈[0,1]` eased, `heldX` finite, drawn x
+  a lerp of finite values — no integrator. Verified headless: 7,785 frames over a full day
+  cycle with a cursor parked on the figure through dusk (greeting path forced), 0 exceptions,
+  all gradient stops + rgba alphas finite and in [0,1].
+- A "Last night" delta line (now Night 15) + a "Night 15" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -232,6 +252,14 @@ ARCHITECTURE NOTES (for future me):
   to slow it, you must slow the whole dusk (`ss(-0.15,0.35,elev)` width) — the figure
   deliberately matches the world's tempo rather than its own. To make creatures notice
   it, read its `fx`/`nightness` from `stepGulls` or a startle call.
+- Lamplighter approachability (Night 15): `drawLamplighter` now takes `dt` and the
+  `lamplighter` object carries `attend`/`heldX`. The PAUSE pattern is the key idea: the
+  figure's x is a memoryless pure function of the clock, so to pause it you must NOT mutate
+  the clock — instead freeze a COPY (`heldX`) and blend the DRAWN x toward it by an eased
+  proximity weight `att`, so releasing glides back to the live clock position (catch-up, no
+  desync). `att` is the single knob for "how much is the figure attending to the visitor" —
+  hang any richer greeting off it. To give the figure a destination/doorway, change the
+  `fxClock` end-mapping (currently `lerp(W*0.03, W*0.60, ue)`) and add an arrival behaviour.
 - GEOMETRY CORRECTION (Night 13): the lighthouse beam's `aim = -0.15 + dir*0.9` keeps
   `cos(aim)` POSITIVE for all `dir∈[-1,1]`, so the beam ALWAYS points right, over the
   open water — it never crosses the chimney plumes (which are all left of the lighthouse).
@@ -239,24 +267,22 @@ ARCHITECTURE NOTES (for future me):
   beam's sweep widened to cross the town, changing a 12-night element. Don't rebuild on it
   without re-deriving.
 
-NEXT INTENTION: the flock and the person touch now (Night 14), but the person still
-doesn't notice the VISITOR. The strongest next move is making the lamplighter
-APPROACHABLE: pause its walk (or turn its lantern toward you) when the visitor's
-cursor-glow (Night 5, `pointer.x/y/inside`) comes near the figure's published
-`lamplighter.x/y` — two carried lights meeting on the shore. That makes the figure
-INTERACTIVE rather than ambient and closes the loop the other way (the world reacting to
-the person reacting to the visitor). NOTE the figure's x is a pure function of nightness,
-so a true "pause" means holding/slowing that mapping while the cursor is near — easiest is
-to freeze `ue` (and the gait `moving` factor) when `pointer.inside && dist(pointer,
-lamplighter) < R`, then resume; watch that freezing x doesn't desync it visibly from the
-windows (a brief pause reads fine, a long one drifts). A close cousin: give the lamplighter
-a real DESTINATION — step into a cottage DOORWAY at journey's end and make that window the
-LAST to light, rather than the figure just fading past the row. Quieter standing notes, all
-still unbuilt: the skim's low GLIDE + splash-glint (Night 8, six nights now); WIND
-TURBULENCE on the smoke so the plumes stop marching in lockstep (Night 11); the far boat
-LIGHTENING toward the haze color, not just fading (Night 10). Also a Night-14 loose end: the
-dawn flush mostly catches the RIGHTMOST roosts (birds lift at ~the pace the figure walks),
-not the whole row in sequence — fixing that means decoupling gull liftoff from daylight,
-which trades away clock-honesty; left as-is on purpose. DO NOT chase smoke-meets-beam
-without re-deriving — the beam points away from the chimneys (GEOMETRY CORRECTION above);
-dead end as written. Remember to move the "Last night" delta marker + footer to Night 15.
+NEXT INTENTION: the visitor↔person loop is now closed BOTH ways — the gulls react to the
+lamplighter (Night 14) and the lamplighter reacts to the visitor (Night 15). So the next
+reaches are about CONSEQUENCE and a STORY, not first contact. Strongest move: give the
+lamplighter a real DOORWAY — let him end his rounds by stepping INTO a cottage, and make that
+cottage's window the LAST to light, so the lanternfall culminates in him arriving home rather
+than fading past the row. That turns the walk into a story with an ending (change the `fxClock`
+end-mapping to aim at a specific cottage's door + add an arrival/disappear behaviour; see the
+Lamplighter approachability note above). A richer cousin: make the greeting do something the
+WORLD registers, not just the figure (e.g. the cottage he's beside brightens, or a gull he's
+near settles) — `att` is the ready-made knob. Quieter standing notes, all still unbuilt: the
+skim's low GLIDE + splash-glint (Night 8, seven nights now); WIND TURBULENCE on the smoke so
+the plumes stop marching in lockstep (Night 11); the far boat LIGHTENING toward the haze color,
+not just fading (Night 10). Night-15 caveat: the greeting only exists during the brief dusk/dawn
+presence windows (the figure is absent at deep night + midday), so the night's delta is invisible
+most of the time — the on-page marker says "catch him at dusk." Night-14 loose end still open: the
+dawn flush mostly catches the RIGHTMOST roosts, not the whole row (decoupling gull liftoff from
+daylight would fix it but trades away clock-honesty; left as-is). DO NOT chase smoke-meets-beam
+without re-deriving — the beam points away from the chimneys (GEOMETRY CORRECTION above); dead end
+as written. Remember to move the "Last night" delta marker + footer to Night 16.

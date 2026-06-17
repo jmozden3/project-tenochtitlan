@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>lamplighter notices you</b> &mdash; bring your cursor near the
-    figure as it walks the shore at <b>dusk</b> and it <b>stops and lifts its lantern toward
-    your glow</b>, two carried lights meeting. Move away and it resumes its rounds. The first
-    time a <b>person</b> in Lanternfall acknowledges the visitor.
+    <b>Last night:</b> the <b>lamplighter comes home</b> &mdash; at the end of his dusk rounds he
+    now walks to the <b>last cottage's door</b>, which fills with warm light and swings open as
+    its window (the last to light) blooms, and he <b>steps inside</b>. His walk finally has an
+    ending. Catch him arriving at <b>dusk</b>; lingering past midnight, he comes back out at dawn.
   </p>
 
-  <footer>Night 15 &middot; founded 2026-06-02</footer>
+  <footer>Night 16 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -151,6 +151,16 @@
       town.buildings.push({ x, baseY, w, h, body: palette[c][0], roof: palette[c][1], wins, chim });
     }
   })();
+
+  // ---- Night 16: the lamplighter's HOME. The last cottage in the row (rightmost,
+  // and already the LAST window to light — the climax of the lanternfall) is his.
+  // He ends his nightly rounds by walking to its DOOR and stepping inside, rather
+  // than fading past the row. The door is offset beside the window so both fit on
+  // the little cottage; drawBuildings draws it (it glows + swings open as he enters),
+  // and drawLamplighter aims his walk at `door.cx`.
+  const home = town.buildings[town.buildings.length - 1];
+  home.door = { cx: home.x - 9, w: 7, h: 14 };
+  town.home = home;
 
   // ---- Night 6: the harbor's GULLS — the first CREATURES in Lanternfall, with
   // a daily routine and a startle reflex. By day they wheel over the water; as
@@ -462,6 +472,32 @@
           ctx.fillRect(hx - 3 + wob, town.horizon, 6, 46);
         }
       }
+
+      // Night 16: the home cottage's DOOR — the lamplighter steps through it at the
+      // end of his rounds (see drawLamplighter). A dark recess that fills with warm
+      // light and swings open as deep dusk arrives. `enter` is recomputed here from
+      // the clock (the exact value drawLamplighter uses, no shared state), and the
+      // hearth term is the home window's own glow — so the door blooms at the same
+      // moment the last window lights and the figure arrives. At dawn it runs backward.
+      if (b.door) {
+        const d = b.door, dx = d.cx - d.w / 2, dy = b.baseY - d.h;
+        ctx.fillStyle = "#0b0e16";
+        ctx.fillRect(dx, dy, d.w, d.h);
+        const hearth = ss(b.wins[0].thresh - 0.06, b.wins[0].thresh + 0.06, c.nightness);
+        const enter = ss(0.78, 0.92, c.nightness);
+        const open = Math.max(hearth * 0.45, enter);
+        if (open > 0.02) {
+          const ow = d.w * (0.5 + 0.5 * enter);          // the door swings wider as he steps in
+          ctx.fillStyle = `rgba(255,198,120,${0.55 * open})`;
+          ctx.fillRect(d.cx - ow / 2, dy + 1.5, ow, d.h - 1.5);
+          // warm light spilling out across the doorstep
+          const sg = ctx.createLinearGradient(0, b.baseY, 0, b.baseY + 20);
+          sg.addColorStop(0, `rgba(255,198,120,${0.16 * open})`);
+          sg.addColorStop(1, "rgba(255,198,120,0)");
+          ctx.fillStyle = sg;
+          ctx.fillRect(d.cx - ow - 2, b.baseY, ow * 2 + 4, 20);
+        }
+      }
     }
   }
 
@@ -526,17 +562,23 @@
   // and `heldX` to freeze its walk while paused.
   const lamplighter = { active: false, x: 0, y: 0, attend: 0, heldX: 0 };
   function drawLamplighter(t, dt, c) {
-    // Present only while the town is lighting/snuffing: fades in at dusk, out by deep
-    // night (gone home), absent by day. At dawn it fades back in and reverses for free.
-    const presence = ss(0.12, 0.22, c.nightness) * (1 - ss(0.80, 0.92, c.nightness));
+    // Night 16: he COMES HOME. `enter` ramps through deep dusk — the SAME nightness
+    // band that lights his home window (the last in the row) — so instead of "fading
+    // out by deep night," the figure now steps THROUGH the home cottage's door exactly
+    // as its hearth blooms: the lanternfall culminates in his arrival, not his exit.
+    // It's a pure function of the clock, so drawBuildings derives the matching door
+    // glow for free, and at dawn it runs backward — he emerges from the door, then
+    // walks left snuffing the row. The old 0.80→0.92 fade-out IS this entering now.
+    const enter = ss(0.78, 0.92, c.nightness);
+    const presence = ss(0.12, 0.22, c.nightness) * (1 - enter);
     if (presence < 0.02) { lamplighter.active = false; lamplighter.attend = 0; return; }
     // Walk the row: x tracks nightness over the same band the windows light across,
     // so the figure sweeps past each cottage as its threshold is crossed. This is the
     // position the figure "should" be at for this hour, before any pause.
     const u = Math.max(0, Math.min(1, (c.nightness - 0.15) / 0.62));
     const ue = u * u * (3 - 2 * u);                  // ease the start and the stop
-    const fxClock = lerp(W * 0.03, W * 0.60, ue);    // 0.60W stays on the spit, past the last cottage
-    const fy = town.horizon + 13;                    // on the spit, at the waterline
+    const fxClock = lerp(W * 0.03, town.home.door.cx, ue);  // his rounds end at his own front door
+    const fy = town.horizon + 13 - enter * 7;        // on the spit; steps up onto the doorstep as he enters
 
     // ---- Night 15: the lamplighter is APPROACHABLE — the first time a PERSON in
     // Lanternfall acknowledges the visitor. Since Night 5 the cursor carries its own

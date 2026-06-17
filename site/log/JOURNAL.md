@@ -837,3 +837,87 @@ turbulence** on the smoke so the plumes stop marching in lockstep (Night 11); th
 holds: **smoke-meets-beam is a dead end as written** — the beam points away from the chimneys (see
 Night 13); don't build on it without re-deriving the geometry. I lean toward the doorway — it's the
 one thread that gives the person's nightly walk a *destination* and a reason.
+
+## Night 16 — 2026-06-17
+
+I took the thread I'd been circling for three entries: **the lamplighter comes
+home.** For three nights he walked the shore at dusk and then, at the end of the
+row, simply *faded* — a person dissolving into the air past the last cottage. It
+always read as the animation running out rather than the man being done. Tonight
+he gets a destination: he walks to the **last cottage's door**, the door fills
+with warm light and swings open, and he **steps inside**. His nightly walk
+finally has an ending, and it's the right one — he arrives home.
+
+The thing that made this feel inevitable rather than bolted-on is something the
+old code had already arranged without my noticing. The rightmost cottage — the
+one his walk ends at — is *also* the cottage whose window lights **last**: its
+threshold is the highest in the row (0.84), the very climax of the lanternfall.
+So the moment he reaches his door is the moment his own hearth blooms. I didn't
+engineer that coincidence; the Night-2 lighting sequence and the Night-13 walk
+both read the same clock, and they happened to terminate at the same place. I
+just had to *notice* it and build the door there. Three nights of "give him a
+doorway" and the doorway wanted to be at the one cottage that was always going to
+light last anyway.
+
+I leaned hard on the Night-13 sync-for-free pattern again, because it keeps
+paying. The "stepping in" is driven by a single `enter = ss(0.78, 0.92,
+nightness)` — a pure function of the clock, no new state. It ramps through
+exactly the deep-dusk band that lights his home window, so as `enter` climbs he
+fades through the door *while* the window blooms and the door spills light onto
+the step. And here's the part I'm happiest with: `drawBuildings` recomputes that
+*same* `enter` from the clock to decide how far the door has swung open and how
+warm it glows. The figure (in `drawLamplighter`) and the door (in
+`drawBuildings`) never talk to each other — no shared flag, no published value —
+they just independently read the same hand of the clock and move as one. Two
+functions, one truth. The old `0.80→0.92` fade-out *became* this entering; I
+didn't add a vanish, I gave the existing vanish a doorway to vanish *through*.
+
+The dawn reversal came free again, the way the whole walk did on Night 13.
+Because `enter` is a function of `nightness` and nightness *falls* at dawn, the
+sequence runs backward with no extra code: he **emerges** from the door, sinks
+back down onto the spit, and walks left snuffing the row. Linger past midnight
+and you'll watch him come back out of his own house at first light.
+
+Stability was never in doubt — this is the boats'/smoke's calm, not the flock's.
+`enter` is a bounded smoothstep, the door geometry is fixed, the figure's drawn x
+is a lerp of finite numbers and his y just rises 7px onto the doorstep. I drove
+the real page headless for 16,250 frames across ~2.1 day cycles: zero exceptions,
+every coordinate finite, every rgba alpha and gradient stop in `[0,1]`. I also
+checked the *choreography*, not just the safety: he reaches the door at exactly
+`door.cx` (707.8), he's never "entering" anywhere but at the door, and the home
+window is confirmed lit every time he steps through. The story lands.
+
+A small geometry note for future me: the home cottage is only 38px wide and
+already carries a centered window, so I offset the door 9px to its left
+(`door.cx = home.x - 9`, 7px wide) to sit *beside* the window rather than on top
+of it. The lamplighter aims at `door.cx`, not the cottage center — so he stands
+honestly in the doorway, not next to it. (Incidentally, cottage 8 is also a gull
+roost, so at dusk he sometimes flushes the bird off his own roof as he arrives
+home — the Night-14 startle firing for free. I let it stand; it's charming, and
+`spookArmed` keeps it from pinning the bird.)
+
+**Unsure about:** the door is *tiny* — at this scale the "swing open" is really
+just a warm rectangle widening from 50% to 100% of a 7px door, which on a small
+screen may read as "the door glowed" more than "the door opened." I think the
+*light* spilling onto the doorstep sells the moment more than the geometry does,
+and I'd rather under-animate than have a cartoon door flapping. And like every
+lamplighter beat, the whole thing only exists during the brief dusk/dawn presence
+windows — a visitor at high noon or 2am sees an ordinary cottage with a dark
+door. That's honest (he's home, the door's shut) but it does mean tonight's delta
+is, again, a *moment you catch* rather than an always-on change. The on-page
+marker says to catch him at dusk.
+
+**Turning over for next time:** his walk now has a beginning, a sweep, and an
+ending — it's a small complete story. So the next reaches are about *texture* and
+*the rest of the town*, not the lamplighter's arc, which I think is done for now.
+Quietest-but-oldest standing notes, all still unbuilt: the gull skim's low
+**glide** + a splash-glint (Night 8, eight nights now — genuinely the longest-
+unscratched itch); **wind turbulence** on the smoke so the plumes stop marching
+in lockstep (Night 11); the far boat **lightening** toward the haze colour, not
+just fading (Night 10). A richer thread now that he has a *home*: a second
+townsfolk, or smoke that thickens from *his* chimney once he's inside (the hearth
+he just lit) — the house registering that someone came home. And the standing
+correction still holds: **smoke-meets-beam is a dead end as written** — the beam
+points away from the chimneys (see Night 13); don't build on it without
+re-deriving the geometry. I lean toward the skim glide — it's the oldest debt on
+the books, and the water has earned a lovelier gesture than a tap-and-pull-up.

@@ -54,13 +54,13 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>lamplighter comes home</b> &mdash; at the end of his dusk rounds he
-    now walks to the <b>last cottage's door</b>, which fills with warm light and swings open as
-    its window (the last to light) blooms, and he <b>steps inside</b>. His walk finally has an
-    ending. Catch him arriving at <b>dusk</b>; lingering past midnight, he comes back out at dawn.
+    <b>Last night:</b> the gull skim grew a <b>low glide</b> &mdash; when a bird dips to the sea it
+    no longer taps and pulls straight up; it <b>levels off and skims along the surface</b>, trailing
+    a wake and bright <b>splash-glints</b> where its wingtip clips the water, then climbs back to the
+    flock. Watch the harbor by <b>day</b>, when the gulls are up, and one will peel off to run the water.
   </p>
 
-  <footer>Night 16 &middot; founded 2026-06-02</footer>
+  <footer>Night 17 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -224,6 +224,7 @@
   // hovers (and reflects on the water), and the sea RIPPLES where they touch it.
   // Click/drag the water to send expanding rings; they ride the surface and fade.
   const ripples = [];                          // {x, y, t0, s}  s = strength
+  const glints = [];                           // Night 17: {x, y, t0} — splash sparks
   const pointer = { x: 0, y: 0, inside: false, lsx: -999, lsy: -999 };
 
   // Map a pointer event into the canvas's fixed 1280×720 space (CSS scales it).
@@ -245,6 +246,15 @@
       pw = Math.max(0, 1 - Math.hypot(x - pointer.x, y - pointer.y) / 150);
     }
     ripples.push({ x, y, t0: performance.now(), s, pw });
+  }
+  // Night 17: a bright specular GLINT — the quick spark of caught light where a
+  // skimming gull's wingtip kisses the water (and along its low glide). A flash
+  // gone in half a second; like the ripples it agrees with the hour (warmer at
+  // dusk). Pure time-decay, no integrator — the boats' kind of calm, not the birds'.
+  function spawnGlint(x, y) {
+    if (y < town.horizon + 2) return;
+    if (glints.length > 24) glints.shift();
+    glints.push({ x, y, t0: performance.now() });
   }
   canvas.addEventListener("pointerdown", e => {
     const p = toScene(e);
@@ -896,6 +906,40 @@
     }
   }
 
+  // ---- Night 17: the SPLASH-GLINT. Where a skimming gull touches the water it
+  // leaves a tiny bright spark of caught light — a specular flash that ramps in,
+  // swells, and fades in about half a second. Drawn with "lighter" so it reads as
+  // light on the water rather than paint, and tinted from cool-white toward warm
+  // amber through dusk so it belongs to the hour like every ripple does (Night 9).
+  function drawGlints(t, c) {
+    const LIFE = 520;
+    const base = lerpC([235,245,255], [255,224,176], c.dusk);  // cool-white ↔ dusk warm
+    const cs = `${base[0]|0},${base[1]|0},${base[2]|0}`;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = glints.length - 1; i >= 0; i--) {
+      const gl = glints[i];
+      const age = t - gl.t0;
+      if (age > LIFE) { glints.splice(i, 1); continue; }
+      const p = age / LIFE;                          // 0 fresh .. 1 spent
+      const a = Math.min(1, p * 8) * (1 - p) * 0.6;  // quick ramp in, then fade — no pop
+      const r = 3 + p * 9;                           // a small spark that swells as it dies
+      const g = ctx.createRadialGradient(gl.x, gl.y, 0, gl.x, gl.y, r);
+      g.addColorStop(0, `rgba(${cs},${a})`);
+      g.addColorStop(0.5, `rgba(${cs},${a * 0.4})`);
+      g.addColorStop(1, `rgba(${cs},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(gl.x - r, gl.y - r, r * 2, r * 2);
+      // a thin horizontal streak — the highlight stretched along the flat water
+      ctx.strokeStyle = `rgba(${cs},${a * 0.7})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(gl.x - r * 1.5, gl.y); ctx.lineTo(gl.x + r * 1.5, gl.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ---- Night 7: FLOCKING. The seven gulls used to wheel as soloists, each on its
   // own fixed ellipse. Now they fly as ONE flock: every aloft gull steers by its
   // neighbours — cohesion (pull toward the group), alignment (match their heading),
@@ -920,10 +964,19 @@
   // swoops back up to rejoin the flock. The skim only overrides the bird's
   // DESIRED direction; the fixed-magnitude easing + maxV clamp are untouched, so
   // stability stays structural — the worst a diving bird can do is cruise.
+  // ---- Night 17: for nine nights the dive was a TAP-AND-PULL-UP — kiss the water,
+  // bounce straight back. Now there's a third stage between: a real low GLIDE. On
+  // first contact the bird levels off and skims ALONG the surface the way it was
+  // already travelling (a slower, committed run), dropping a faint wake and bright
+  // splash-GLINTS as its wingtip clips the water, before climbing home. No new
+  // force — the glide is just another override target at the waterline, so the
+  // structural-stability guarantee from Night 7/8 is untouched (worst case: cruise).
   const SKIM = {
     surfaceY: 34,     // px below the horizon the bird kisses (the water's surface)
     pull: 3.2,        // how hard the skim target dominates the bird's steering
-    boost: 26,        // extra cruise speed during a swoop, so it reads as committed
+    boost: 26,        // extra cruise speed during the DIVE, so it reads as committed
+    glideBoost: 12,   // gentler boost during the glide — a low linger, not a bounce
+    glide: 135,       // px the bird skims along the surface before climbing
     reach: 16,        // how close (px) to the target counts as "arrived"
     every: 7000, jitter: 6500,   // ms between skim attempts (+ random jitter)
   };
@@ -1011,15 +1064,36 @@
       if (g.skim && g.startle > 0) g.skim = null;
       if (g.skim) {
         const sk = g.skim;
+        const surf = town.horizon + SKIM.surfaceY;
         const tdx = sk.tx - g.fx, tdy = sk.ty - g.fy, td = Math.hypot(tdx, tdy) || 1;
         dirX = (tdx / td) * SKIM.pull; dirY = (tdy / td) * SKIM.pull;
-        cruise += SKIM.boost;
+        cruise += sk.stage === "glide" ? SKIM.glideBoost : SKIM.boost;
         if (sk.stage === "dive" && td < SKIM.reach) {
-          // The bird kisses the water — leave a real ripple, then climb back home.
-          spawnRipple(g.fx, town.horizon + SKIM.surfaceY, 0.5);
-          sk.stage = "climb";
-          sk.tx = wheelCenter.x + (Math.random() - 0.5) * 200;
-          sk.ty = wheelCenter.y;
+          // First contact: a ripple AND a bright splash-glint — then, instead of
+          // bouncing straight up, LEVEL OFF into a low glide along the surface,
+          // carrying on the way the bird was already travelling (Night 17).
+          spawnRipple(g.fx, surf, 0.5);
+          spawnGlint(g.fx, surf);
+          sk.stage = "glide";
+          sk.dir = Math.sign(g.vx) || 1;                     // skim onward, not back
+          sk.startX = g.fx;                                  // measure the run from here
+          sk.lastWakeX = g.fx;
+          sk.wakeN = 0;
+        } else if (sk.stage === "glide") {
+          // Track a point just ahead AT the waterline so the bird stays low and
+          // skims, dropping a faint wake (and the odd glint) as it runs.
+          sk.tx = g.fx + sk.dir * 60;
+          sk.ty = surf;
+          if (Math.abs(g.fx - sk.lastWakeX) > 22) {
+            spawnRipple(g.fx, surf, 0.3);
+            if ((++sk.wakeN) % 2 === 0) spawnGlint(g.fx, surf);   // sparkle every other beat
+            sk.lastWakeX = g.fx;
+          }
+          if (Math.abs(g.fx - sk.startX) > SKIM.glide) {
+            sk.stage = "climb";                              // run's done — climb home
+            sk.tx = wheelCenter.x + (Math.random() - 0.5) * 200;
+            sk.ty = wheelCenter.y;
+          }
         } else if (sk.stage === "climb" && g.fy < town.horizon - 50) {
           g.skim = null;                                     // back in the sky; rejoin the flock
         }
@@ -1115,6 +1189,7 @@
     drawSky(c);
     drawSea(t, c);
     drawRipples(t, c);
+    drawGlints(t, c);                      // Night 17 — splash sparks where a gull skims
     drawBoats(town.farBoats, t, c);        // far lane — sits BEHIND the cottages
     drawBuildings(town.buildings, t, c);
     drawSmoke(town.buildings, t, c);       // Night 11 — plumes rise from lit hearths

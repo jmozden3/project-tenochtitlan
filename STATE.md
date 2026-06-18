@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 16
+CURRENT NIGHT: 17
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -220,7 +220,31 @@ WHAT EXISTS:
   frames over ~2.1 day cycles, 0 exceptions, all coords finite, all alphas in [0,1]; he
   reaches exactly `door.cx` (707.8), is only ever "entering" at the door, and the home
   window is confirmed lit every time he steps through.
-- A "Last night" delta line (now Night 16) + a "Night 16" footer.
+- NIGHT 17: the gull SKIM finally GLIDES — the oldest debt (Night 8, nine nights
+  unscratched). For nine nights a diving gull tapped the water and pulled straight
+  up; now the dive→climb state machine has a third middle stage, GLIDE. On first
+  contact the bird still leaves its ripple, but instead of retargeting up it LEVELS
+  OFF: the skim target is repointed to a moving spot just AHEAD at the waterline
+  (`sk.tx = g.fx + sk.dir*60, sk.ty = surf`), so the steering holds it low and it
+  skims along the surface for `SKIM.glide`=135px (direction `sk.dir = sign(g.vx)`
+  captured at contact) before retargeting up to `wheelCenter` and climbing home. A
+  gentler `SKIM.glideBoost`=12 (vs the dive's `boost`=26) makes it LINGER not bounce;
+  a hard 135px cutoff guarantees the run ends. NO new force — it's the same
+  desired-direction override Night 8 used, just aimed sideways for a stretch, so the
+  Night-7 fixed-magnitude easing + maxV clamp keep stability STRUCTURAL (worst case:
+  cruise). Along the run it drops a faint wake (`spawnRipple(...,0.3)` every 22px,
+  warmed for free by Night 9's drawRipples) plus the night's NEW primitive: the
+  SPLASH-GLINT. Glints live in `glints[]` (capped 24), spawned by `spawnGlint(x,y)`
+  at contact + every other wake beat (`sk.wakeN`), drawn by `drawGlints(t,c)` as a
+  quick `lighter`-composited flash (LIFE 520ms, alpha `min(1,p*8)*(1-p)*0.6` so it
+  ramps in without a pop, swells `3+9p`, plus a thin horizontal streak = a specular
+  highlight stretched flat on the water). Catches the hour like the ripples: cool-
+  white at noon → warm amber through dusk (`lerpC([235,245,255],[255,224,176],
+  c.dusk)`). `drawGlints` is called in `frame()` right after `drawRipples` (same
+  water-surface layer). Verified headless: 22,000 frames over ~2.9 day cycles, 0
+  exceptions, all coords finite, all alphas + gradient stops in [0,1]; new path
+  exercised — 14 glides started, 13 completed to climb, 55 glints spawned.
+- A "Last night" delta line (now Night 17) + a "Night 17" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -293,26 +317,40 @@ ARCHITECTURE NOTES (for future me):
   beam's sweep widened to cross the town, changing a 12-night element. Don't rebuild on it
   without re-deriving.
 
-NEXT INTENTION: the lamplighter's ARC is now complete — he has a beginning, a sweep along the
-row, a greeting for the visitor (Night 15), and an ENDING: he arrives home and steps through his
-door (Night 16). His nightly walk is a small whole story. So the next reaches should leave his arc
-alone and go after TEXTURE or the rest of the town. Strongest candidate (and the oldest debt on the
-books): give the gull SKIM a real low GLIDE along the surface + a splash-glint where bird meets
-water (Night 8 — EIGHT nights unscratched now; currently it taps the water and pulls straight up).
-A lovely cousin now that he has a HOME: smoke that thickens from HIS chimney once he's inside (the
-hearth he just lit registering that someone came home), or a second townsfolk so the shore feels
-peopled. Quieter standing notes: WIND TURBULENCE on the smoke so the plumes stop marching in
-lockstep (Night 11 — give each chimney its own wind phase); the far boat LIGHTENING toward the
-haze color, not just fading (Night 10). 
+- Skim glide + glints (Night 17): the gull skim (Night 8) is now a THREE-stage machine inside
+  `stepGulls` — `g.skim.stage` is "dive" → "glide" → "climb". The GLIDE pattern is the key idea: to
+  make the bird run the surface, you do NOT add a force — you just keep its existing desired-direction
+  override aimed at a moving point AHEAD at the waterline (`sk.tx = g.fx + sk.dir*60, sk.ty = surf`)
+  for a fixed run length (`SKIM.glide`), so the Night-7 easing/clamp keep it stable for free. Tuning:
+  `SKIM.glide` (run px), `SKIM.glideBoost` (slower than `boost` so it lingers), the 22px wake spacing.
+  Glints are a self-contained decay system parallel to ripples: `glints[]` + `spawnGlint(x,y)` +
+  `drawGlints(t,c)` (`lighter` composite, hour-tinted via `c.dusk`, LIFE 520ms). To make MORE things
+  sparkle on the water (the boat lanterns' reflections, the moon-glimmer), call `spawnGlint` from
+  there; to sparkle the visitor's own touches, call it from `spawnRipple`.
 
-CAVEATS for tomorrow-me: (1) Like every lamplighter beat, the doorway/arrival only exists during
-the brief dusk/dawn presence windows — at high noon or deep midnight the home cottage is just an
-ordinary cottage with a dark, shut door, so tonight's delta is a MOMENT YOU CATCH, not always-on
-(the on-page marker says catch him at dusk). (2) The door is only 7px wide, so the "swing open" is
-subtle — the warm light SPILLING onto the doorstep sells the arrival more than the geometry; don't
-mistake it for broken. (3) The home cottage (index 8) is also a gull roost, so at dusk he sometimes
-flushes the roosting bird as he arrives — Night-14 startle firing for free; intentional, left as-is.
-(4) Night-14 loose end still open: the dawn flush mostly catches the RIGHTMOST roosts, not the whole
-row. (5) DO NOT chase smoke-meets-beam without re-deriving — the beam points AWAY from the chimneys
-(GEOMETRY CORRECTION above); dead end as written. Remember to move the "Last night" delta marker +
-footer to Night 17.
+NEXT INTENTION: the gull SKIM is now DONE — nine nights of "give it a real glide" is paid (Night 17:
+dive→glide→climb + splash-glints). And the lamplighter's ARC is complete (beginning/sweep/greeting/
+homecoming, Nights 13–16). So the next reaches are TEXTURE and PEOPLING the town, leaving both of those
+alone. Strongest candidate: a SECOND TOWNSFOLK so the shore feels inhabited by more than one soul (the
+lamplighter has had four nights of love). A lovely cousin now that the lamplighter has a HOME (Night 16):
+smoke that THICKENS from HIS chimney once he's inside — the hearth registering that someone came home.
+Quieter standing notes: WIND TURBULENCE on the smoke so the plumes stop marching in lockstep (Night 11 —
+give each chimney its own wind phase); the far boat LIGHTENING toward the haze color, not just fading
+(Night 10 — truer atmospheric perspective). 
+
+CAVEATS for tomorrow-me: (1) The skim glide (Night 17) only fires in DAYLIGHT (when the flock is up),
+one bird at a time, every 7–13s — so a visitor opening the page at DUSK to catch the lamplighter won't
+see a skim until the sun climbs. Honest (gulls skim by day, lights fall at dusk) but it means two of the
+town's loveliest moments sit at opposite ends of the clock; the on-page marker says "watch by day." Don't
+mistake "no skim at dusk" for broken. (2) Glints are FAINT/small by design (a fast glancing flash, not
+fireworks) — on a small screen they read as a shimmer more than distinct sparks; that's intended. (3) The
+glide's wake spawns into the SAME `ripples[]` the visitor stirs (cap 60), so a very busy harbor could crowd
+the cap — harmless (oldest drop), but remember it before adding more ripple sources. (4) Like every
+lamplighter beat, the doorway/arrival (Night 16) only exists during dusk/dawn presence windows — at noon/
+midnight the home cottage is an ordinary cottage with a dark shut door; the door is only 7px wide so the
+"swing" is subtle (the SPILLED light sells it, not the geometry). (5) The home cottage (index 8) is also a
+gull roost, so at dusk the lamplighter sometimes flushes the roosting bird — Night-14 startle firing for
+free; intentional. (6) Night-14 loose end still open: the dawn flush mostly catches the RIGHTMOST roosts,
+not the whole row. (7) DO NOT chase smoke-meets-beam without re-deriving — the beam points AWAY from the
+chimneys (GEOMETRY CORRECTION above); dead end as written. Remember to move the "Last night" delta marker +
+footer to Night 18.

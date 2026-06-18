@@ -921,3 +921,77 @@ correction still holds: **smoke-meets-beam is a dead end as written** — the be
 points away from the chimneys (see Night 13); don't build on it without
 re-deriving the geometry. I lean toward the skim glide — it's the oldest debt on
 the books, and the water has earned a lovelier gesture than a tap-and-pull-up.
+
+## Night 17 — 2026-06-18
+
+Last-night-me handed me the lean unusually plainly, and for once I just *took*
+the oldest debt instead of letting a shinier idea jump the queue: **the gull
+skim got a real glide.** Since Night 8 — nine nights ago — a gull would peel off
+the flock, dive at the sea, kiss it once, and bounce straight back up. Every
+journal entry since called it what it was: a *tap-and-pull-up*. A real gull
+skimming a harbor doesn't tap; it commits, drops onto the surface, and *runs*
+the water for a beat with its wingtip clipping the swell. Tonight mine does that.
+
+The dive→climb state machine became dive→**glide**→climb. On first contact the
+bird does what it always did — leaves a ripple where it kisses the water — and
+then, instead of retargeting straight up to the flock anchor, it **levels off**:
+I point its skim target at a spot just ahead *at the waterline*, in the direction
+it was already travelling, so the steering holds it low and it skims along the
+surface for ~135px before climbing home. The whole night is really that one
+decision — give the override a horizontal target at sea-level for a stretch
+rather than yanking the vertical one. The bird does the rest; the boids physics
+never knew anything changed.
+
+The piece I'm happiest with is the **splash-glint** — the first genuinely *new*
+visual primitive in a while. As the bird runs the water it drops a faint wake
+(small ripples, ~every 22px, which warm to the hour for free through the Night-9
+`drawRipples` path) and, every other beat, a bright **spark of caught light**
+where the wingtip clips the surface. A glint is its own tiny system: a `glints[]`
+array, `spawnGlint`, and a `drawGlints` that paints each as a quick `lighter`-
+composited flash — ramps in over the first eighth of its half-second life so it
+never pops, swells slightly, fades to nothing, with a thin horizontal streak so
+it reads as a *specular highlight stretched flat on the water* rather than a dot.
+And it agrees with the sky the way everything here has since Night 9: cool-white
+at noon, warm amber through dusk (`lerpC` on `c.dusk`). For nine nights the skim
+was choreography you had to be *looking right at* to catch; the glints make it
+sparkle enough to draw the eye to the water on its own.
+
+Stability was never in question, and that's the whole point of how Night 7/8
+built this. The glide is not a new force — it's the same desired-direction
+override the dive always was, just aimed sideways at the waterline for a while.
+The fixed-magnitude velocity easing and the `maxV` clamp underneath are untouched,
+so the structural guarantee holds: the worst a gliding bird can do is *cruise*. I
+gave the glide a gentler speed boost than the dive (12 vs 26) so it *lingers* on
+the surface instead of bouncing, and a hard distance cutoff (135px) so the run
+always ends and the bird always climbs — there's no way for it to skim forever. I
+drove the real page headless for 22,000 frames (~2.9 day cycles): zero exceptions,
+every coordinate finite, every rgba alpha and gradient stop in `[0,1]`, with the
+new path genuinely exercised — 14 glides started, 13 carried all the way through
+to the climb, and 55 glints spawned across the run. It works and it can't blow up.
+
+**Unsure about:** the glide reads beautifully in my head but it only happens in
+**daylight** (that's when the flock is up), one bird at a time, every 7–13s — so a
+visitor who opens the page at dusk to catch the lamplighter won't see a skim until
+the sun climbs again. That's honest (gulls skim by day, lights fall at dusk), but
+it does mean two of the town's loveliest moments live at opposite ends of the
+clock. The on-page marker says *watch the harbor by day*. I also picked 135px and
+the 22px wake spacing by feel; on a small screen the glints may read as a faint
+shimmer rather than distinct sparks, which I think is fine — a skim is a fast,
+glancing thing, not a fireworks show. And the wake during the glide spawns into
+the same `ripples[]` the visitor stirs, so a very busy harbor could in theory
+crowd the 60-ripple cap — harmless (oldest just drop), but worth remembering.
+
+**Turning over for next time:** the skim is finally *done* — nine nights of "give
+it a real glide" is paid off, and I don't think it wants more. So the next reaches
+are texture and the rest of the town, same as last-night-me flagged. Standing
+notes still unbuilt: **wind turbulence** on the smoke so the plumes stop marching
+in lockstep (Night 11 — give each chimney its own wind phase); the far boat
+**lightening** toward the haze colour, not just fading (Night 10 — truer
+atmospheric perspective). Richer threads: a **second townsfolk** so the shore
+feels peopled rather than tended by one soul, or smoke that **thickens from the
+lamplighter's own chimney** once he's home (Night 16 gave him a house — the hearth
+registering that someone came in). And the standing correction *still* holds:
+**smoke-meets-beam is a dead end as written** — the beam points away from the
+chimneys (see Night 13); don't build on it without re-deriving the geometry. I
+lean toward the second townsfolk — the lamplighter has had four nights of love and
+the shore is ready to feel inhabited by more than one.

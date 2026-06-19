@@ -54,13 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the gull skim grew a <b>low glide</b> &mdash; when a bird dips to the sea it
-    no longer taps and pulls straight up; it <b>levels off and skims along the surface</b>, trailing
-    a wake and bright <b>splash-glints</b> where its wingtip clips the water, then climbs back to the
-    flock. Watch the harbor by <b>day</b>, when the gulls are up, and one will peel off to run the water.
+    <b>Last night:</b> a <b>second townsfolk</b> &mdash; a <b>fisherman</b> now sits at the end of the
+    spit through the <b>daylight</b> hours, a rod over the harbor. Every so often he <b>re-casts</b> and
+    the float arcs out and lands with a real ring on the water. He&rsquo;s the lamplighter&rsquo;s opposite
+    number: he packs up at <b>dusk</b> as the lamplighter steps out to light the row. The shore is peopled
+    now from dawn to dark.
   </p>
 
-  <footer>Night 17 &middot; founded 2026-06-02</footer>
+  <footer>Night 18 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -673,6 +674,106 @@
     ctx.restore();
   }
 
+  // ---- Night 18: a SECOND townsfolk — the FISHERMAN. For five nights the only
+  // soul on the shore was the lamplighter, and he is a creature of dusk and dawn:
+  // by full day the town emptied of people and only the gulls worked the water.
+  // So this figure is the lamplighter's opposite number — a DAYTIME soul. He sits
+  // at the tip of the spit through the bright hours, a rod over the water, and every
+  // so often RE-CASTS: the float arcs out and lands with a real ripple (the Night-5
+  // rings the visitor and the skimming gull already make — warmed for free by the
+  // dusk-aware drawRipples). His presence rides `c.daylight`, the inverse of the
+  // band that brings the lamplighter out, so the two HAND OFF for free: he packs up
+  // as dusk falls and the lamplighter steps out to light the row, and at dawn he
+  // returns as the lamplighter walks home. The shore is now peopled across the whole
+  // clock. No integrator — the cast is a bounded timer, the float a lerp/sin of
+  // finite points — so stability is the boats'/lamplighter's calm, not the flock's.
+  const FISH = {
+    x: W * 0.598,                              // seated at the very end of the spit
+    restX: W * 0.668, restY: town.horizon + 24,// where the float settles on the water
+    castMs: 1050,                              // how long the float's arc takes
+    every: 6500, jitter: 4500,                 // ms between casts (+ random jitter)
+  };
+  const fisher = { active: false, x: 0, y: 0, floatX: FISH.restX, floatY: FISH.restY };
+  let castT = -1;                              // -1 resting; ≥0 = ms elapsed into a cast
+  let castTimer = 1800;                        // until the first cast after he arrives
+  let castTargetX = FISH.restX;               // this cast's landing x (varied a little)
+  function drawFisher(t, dt, c) {
+    // A daytime presence: fades in as the morning brightens, out as dusk falls —
+    // the inverse of the lamplighter's dusk/dawn band, so they share the shore only
+    // briefly at the handoff.
+    const presence = ss(0.55, 0.82, c.daylight);
+    if (presence < 0.02) { fisher.active = false; castT = -1; castTimer = 1800; return; }
+    fisher.active = true;
+
+    const fx = FISH.x, fy = town.horizon - 2;            // seated on the spit's edge
+    const rodTipX = fx + 24, rodTipY = fy - 22;          // the rod held out over the water
+    fisher.x = fx; fisher.y = fy;
+
+    // Advance the cast cycle. Resting → wait out the timer → arc the float out → land.
+    castTimer -= dt;
+    if (castT < 0 && castTimer <= 0) {
+      castT = 0;
+      castTargetX = FISH.restX + (Math.random() - 0.5) * 44;   // a different spot each time
+    }
+    let floatX, floatY;
+    if (castT >= 0) {
+      castT += dt;
+      const cp = Math.min(1, castT / FISH.castMs);             // 0 leaving the rod .. 1 landed
+      floatX = lerp(rodTipX, castTargetX, cp);
+      floatY = lerp(rodTipY, FISH.restY, cp) - Math.sin(cp * Math.PI) * 26;   // an arc up and out
+      if (cp >= 1) {
+        spawnRipple(castTargetX, FISH.restY, 0.6);            // the float lands — a real ring
+        fisher.floatX = castTargetX; fisher.floatY = FISH.restY;
+        castT = -1;
+        castTimer = FISH.every + Math.random() * FISH.jitter;
+      }
+    } else {
+      floatX = fisher.floatX;
+      floatY = fisher.floatY + Math.sin(t * 0.003) * 1.5;     // resting: the float bobs
+    }
+
+    ctx.save();
+    ctx.globalAlpha = presence;
+    const body = "#15171f";
+
+    // Bent legs (sitting): thigh forward, shin down to the shoreline.
+    ctx.strokeStyle = body; ctx.lineWidth = 1.8; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(fx - 1, fy - 4); ctx.lineTo(fx + 7, fy - 5); ctx.lineTo(fx + 8, fy + 1);
+    ctx.stroke();
+    // Hunched torso, leaning a touch toward the water.
+    const shX = fx - 2, shY = fy - 13;
+    ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.moveTo(fx - 1, fy - 4); ctx.lineTo(shX, shY); ctx.stroke();
+    // Head.
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(shX - 0.5, shY - 2.5, 2.2, 0, Math.PI * 2); ctx.fill();
+    // Arm out to the rod grip.
+    const gripX = fx + 5, gripY = fy - 8;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(shX, shY + 2); ctx.lineTo(gripX, gripY); ctx.stroke();
+
+    // The rod — grip up and out over the harbor.
+    ctx.strokeStyle = "rgba(150,134,110,0.85)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(gripX, gripY); ctx.lineTo(rodTipX, rodTipY); ctx.stroke();
+    // The line — rod tip down to the float.
+    ctx.strokeStyle = "rgba(205,214,228,0.32)"; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(rodTipX, rodTipY); ctx.lineTo(floatX, floatY); ctx.stroke();
+
+    // The float — a small red-orange bob riding the surface.
+    if (castT < 0 && floatY > town.horizon) {
+      const rg = ctx.createLinearGradient(0, floatY, 0, floatY + 14);   // its reflection, world-vertical
+      rg.addColorStop(0, "rgba(232,138,98,0.28)");
+      rg.addColorStop(1, "rgba(232,138,98,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(floatX - 1.5, floatY, 3, 14);
+    }
+    ctx.fillStyle = "rgba(234,120,92,0.95)";
+    ctx.beginPath(); ctx.arc(floatX, floatY, 1.7, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+
   function drawBoats(list, t, c) {
     const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
@@ -1194,6 +1295,7 @@
     drawBuildings(town.buildings, t, c);
     drawSmoke(town.buildings, t, c);       // Night 11 — plumes rise from lit hearths
     drawLamplighter(t, dt, c);             // Night 13/15 — walks the shore; pauses to greet the visitor
+    drawFisher(t, dt, c);                  // Night 18 — a daytime soul casting from the spit
     drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
     drawLighthouse(town.lighthouse, t, c);
     stepGulls(t, dt, c);

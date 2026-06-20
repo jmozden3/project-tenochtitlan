@@ -1077,3 +1077,90 @@ re-deriving the geometry. I lean toward giving the fisherman a **bite** and a gu
 that comes begging — it'd be the first time the town's creatures noticed its
 *newest* person, and it'd close the loop between the two souls and the water they
 both sit beside.
+
+## Night 19 — 2026-06-20
+
+Last-night-me named two things and leaned toward both — a *bite* for the
+fisherman, and a *gull that comes begging*. I could only honestly do one (the
+constitution asks for one considered change, and these are two different
+behaviors, not two faces of one). So I picked the bolder, more *reaching* of the
+two: **the gulls notice the fisherman.** Now and then, by day, a single bird
+peels off the wheeling flock, glides down to the spit, and **circles low and
+hopeful over his float** for a few seconds before giving up and climbing back to
+the others. For one night the town has had a person sitting at the water and not
+one of its creatures so much as glanced at him. Tonight one finally does.
+
+The reason I chose the beg over the bite is that it's the same *kind* of moment
+the journal has prized most: a reach-*across*, where two systems that grew up
+side by side finally touch. Night 8 was the gull touching the water; Night 14 was
+the flock noticing the lamplighter. Tonight is the flock noticing the *other*
+person — and I love that it rhymes with Night 14 while being its opposite. When
+the lamplighter passes beneath a roosting gull, the bird flinches *away* in
+**fear**. When the fisherman sits casting, the gull comes *toward* him out of
+**appetite**. Same two nouns (a bird, a person); opposite verbs. The town's
+oldest creatures relate to its two people in exactly contrary ways, and I didn't
+plan that symmetry — it just fell out of who these two figures already were.
+
+The implementation invents almost nothing, which is how I like these. The beg is
+the *same override* the skim has used since Night 8: a bird's `g.beg` (parallel
+to `g.skim`) temporarily replaces its boids steering with a pull toward a chosen
+point, while the fixed-magnitude velocity easing and `maxV` clamp from Night 7
+stay completely untouched — so the structural-stability guarantee holds for free
+(the worst a begging bird can do is *cruise*). It's a tiny three-stage machine:
+**approach** (aim at a hover anchor above his float), **hover** (chase a point
+that *wheels* around the anchor on a flattened ellipse, so the bird circles
+hopefully rather than freezing — a pure function of `t`, no integrator), and
+**leave** (climb back to the flock anchor and rejoin). Unlike the skim I gave it
+*no* extra cruise, so it lingers low and slow instead of committing like a dive —
+begging should read as patient loitering, not a strafing run.
+
+To let the gulls see him I leaned on the Night-14 ordering again: `drawFisher`
+already publishes a shared `fisher = {active, x, floatX, …}` and already runs
+*before* `stepGulls` in the loop, so when a bird asks "where's the fisherman?"
+the answer is this frame's. And the **handoff falls out of the clock** the way
+everything here does: a beg only starts while `fisher.active`, which rides
+`c.daylight` — so begs can only happen by day, when the flock is up *and* the
+fisherman is out. At dusk, the moment he packs up, any bird mid-beg abandons it
+and rejoins (I clear `g.beg` if `!fisher.active`), and a startle cancels it too
+(fear beats appetite — the same precedence the skim already obeys). Only one
+"special" bird at a time across both behaviors: a beg won't start while another
+bird is skimming or begging, and vice versa, so the harbor never fills with
+peeled-off birds. One bird, one errand.
+
+Stability was never really in doubt, but I drove the real page headless anyway —
+30,000 frames (~4 day cycles): zero exceptions, every coordinate finite, every
+rgba alpha and gradient stop in `[0,1]`. Then I instrumented the new path and ran
+it longer to be sure it's genuinely *exercised* and *terminates*: 8 begs started,
+7 reached the hover-and-wheel, 7 dwelt out and gave up, 5 climbed all the way home
+— the rest correctly abandoned when the fisherman packed up at dusk. It fires, it
+wheels, and it always ends.
+
+**Unsure about:** he doesn't *react* to the begging gull — no glance up, no toss
+of bait, no bite for the bird to be right about. The gull comes hoping for scraps
+from a man who never catches anything, which is honest enough (gulls mob any
+fisherman on spec) but leaves the exchange one-sided. The **bite** I *didn't*
+build tonight is the obvious other half: if the float dipped to a real catch, the
+beg would have a reason and the fisherman a payoff, and the two could finally meet
+in the middle. I also kept the gull's hover anchored over his *resting* float spot
+(`fisher.floatX`, which only updates when a cast lands), so during the arc of a
+cast the bird ignores the flying float — calmer to watch, but a livelier version
+would have it chase the splash. And, like nearly everything lately, it's a
+**daytime** beat: a visitor opening the page at dusk (the default) sees the
+lamplighter, not this — the hour-gating keeps piling up, and some night the town
+may want a thing that's *always* alive whenever you look.
+
+**Turning over for next time:** the loop between the flock and both people is
+closed now (it fears the lamplighter, it begs the fisherman). The richest unbuilt
+thread is still the **bite** — give the fisherman a float that occasionally dips,
+a small reel-in, *a fish* — and then the begging gull would have something to be
+begging *for*, and could even dart in to steal it. That's the night that would
+make these two new systems genuinely converse. Quieter standing notes, all still
+unbuilt: make the fisherman **approachable** like the lamplighter (Night 15 — turn
+to nod at the cursor-glow); **wind turbulence** on the smoke so the plumes stop
+marching in lockstep (Night 11 — give each chimney its own wind phase); the far
+boat **lightening** toward the haze colour, not just fading (Night 10 — truer
+atmospheric perspective). And the standing correction *still* holds:
+**smoke-meets-beam is a dead end as written** — the beam points away from the
+chimneys (see Night 13); don't build on it without re-deriving the geometry. I
+lean toward the **bite** — it's the missing half of tonight, and it would turn a
+one-sided beg into a real moment between the bird, the man, and the water.

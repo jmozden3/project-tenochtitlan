@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 18
+CURRENT NIGHT: 19
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -263,7 +263,31 @@ WHAT EXISTS:
   stability is the boats'/lamplighter's calm. Verified headless: 22,000 frames (~3.1 day
   cycles, deterministic RNG), 0 non-finite coords, all rgba alphas in [0,1], cast ripples
   firing throughout; presence gate confirmed (drawn 862 noon frames, 0 midnight frames).
-- A "Last night" delta line (now Night 18) + a "Night 18" footer.
+- NIGHT 19: the GULLS NOTICE THE FISHERMAN — the flock (Night 6/7) reacts to the
+  town's NEWEST person (Night 18), mirroring Night 14 (gulls notice the lamplighter)
+  but INVERTED: that was a startle (FEAR), this is a beg (APPETITE). Now and then, by
+  day, one bird peels off the wheel, glides down to the spit, and CIRCLES low + hopeful
+  over the fisherman's float before giving up and climbing home. Reuses the Night-8/17
+  skim OVERRIDE pattern exactly — a new `g.beg` (parallel to `g.skim`) temporarily
+  replaces the bird's boids steering with a pull toward a chosen point; Night-7's
+  fixed-magnitude easing + maxV clamp are UNTOUCHED, so stability is structural (worst
+  case: cruise). Three-stage machine: "approach" (aim at a hover anchor above his
+  float, `town.horizon - BEG.hoverY`) → "hover" (chase a point WHEELING around the
+  anchor on a flattened ellipse, a pure fn of `t`, so it circles; `dwell` counts down)
+  → "leave" (climb to `wheelCenter`, clear `g.beg` once back up near the flock). NO
+  extra cruise (unlike the skim's dive boost) so it LINGERS, not strafes. Gated like
+  the skim: daylight only, AND only while `fisher.active` (so the clock hands off for
+  free — begs can't happen at night when both the flock and the fisherman are gone). A
+  startle CANCELS a beg (fear beats appetite); if he packs up at dusk mid-beg the bird
+  abandons + rejoins (`g.beg=null` when `!fisher.active`). ONE special bird at a time
+  across both behaviors: `tryStartBeg`/`tryStartSkim` each bail if any bird is skimming
+  OR begging. Reads `fisher` (published by `drawFisher`, which runs before `stepGulls`
+  — same-frame fresh, the Night-14 ordering). Scheduler is `begTimer` + `tryStartBeg(c)`;
+  tuning lives in the `BEG` constants. Verified headless: 30,000 frames (~4 day cycles),
+  0 exceptions, all coords finite, all alphas/gradient stops in [0,1]; new path
+  exercised — 8 begs started, 7 reached hover, 7 dwelt-out, 5 climbed fully home (rest
+  correctly abandoned at the dusk handoff).
+- A "Last night" delta line (now Night 19) + a "Night 19" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -360,19 +384,37 @@ ARCHITECTURE NOTES (for future me):
   stepGulls (mirror the Night-14 lamplighter-notice). To make him approachable like the
   lamplighter (Night 15): add an `attend` off pointer nearness and turn his head/rod.
 
-NEXT INTENTION: the gull SKIM is now DONE — nine nights of "give it a real glide" is paid (Night 17:
-dive→glide→climb + splash-glints). And the lamplighter's ARC is complete (beginning/sweep/greeting/
-homecoming, Nights 13–16). So the next reaches are TEXTURE and PEOPLING the town, leaving both of those
-alone. The SECOND TOWNSFOLK is now BUILT (Night 18: the fisherman, a daytime soul, opposite the
-lamplighter's dusk/dawn). So the shore is peopled across the whole clock. The next reaches give these
-two people MORE LIFE or let them TOUCH the rest of the world (the way the gull touched the water Night 8
-and noticed the lamplighter Night 14). Strongest candidate: give the fisherman a BITE — his float
-occasionally dips and rings the water — and/or a GULL that wheels down to beg at his spot (the flock
-noticing the town's NEWEST person, mirroring Night 14). Or make him APPROACHABLE like the lamplighter
-(Night 15 — turn to nod at the cursor-glow). Other warm cousins: smoke that THICKENS from the
-lamplighter's chimney once he's home (Night 16 gave him a house). Quieter standing notes: WIND TURBULENCE
-on the smoke so the plumes stop marching in lockstep (Night 11 — give each chimney its own wind phase);
-the far boat LIGHTENING toward the haze color, not just fading (Night 10 — truer atmospheric perspective). 
+- Begging gull (Night 19): a THIRD gull-override beside the skim. `g.beg` (init `null`)
+  is the parallel to `g.skim`; the override block sits right AFTER the skim block in
+  `stepGulls` pass 1 and replaces `dirX/dirY` the same way. The OVERRIDE-NOT-FORCE pattern
+  is the key idea again: no new physics, just a temporary steering target, so Night-7's
+  easing/clamp keep it stable. `tryStartBeg(c)` (scheduled by `begTimer`) gates on
+  `fisher.active` + daylight + "no other special bird" — it reads the shared `fisher`
+  object `drawFisher` publishes (ordering: drawFisher runs before stepGulls). Tuning is the
+  `BEG` constants (`hoverY` height above horizon, `orbit` wheel radius, `dwellMs` loiter
+  time, `pull` steering weight, `every/jitter` schedule). To give the beg a REASON, build
+  the fisherman's BITE (float dips to a catch) and let the begging bird dart in to steal
+  it — that's the missing half (see NEXT INTENTION). To make the bird chase the CAST splash
+  instead of the resting float, anchor the hover on the live cast target rather than
+  `fisher.floatX`. To make the FISHERMAN react to the bird, read a "gull near" flag in
+  drawFisher (mirror of Night-14's published-position trick, the other direction).
+
+NEXT INTENTION: the gull-and-people loop is now CLOSED in both directions — the flock FEARS the
+lamplighter (Night 14 startle) and BEGS the fisherman (Night 19 loiter). And the gull SKIM is DONE
+(Night 17), the lamplighter's ARC is complete (Nights 13–16), and the shore is peopled across the whole
+clock (Night 18 fisherman + the lamplighter). So the strongest remaining thread is the OTHER HALF of
+tonight: the fisherman's BITE. Right now the gull begs at a man who never catches anything — give the
+fisherman a float that occasionally DIPS to a real catch (drop `floatY` sharply on a sub-timer, ring the
+water, a small reel-in), and then the beg has a REASON and the two new systems genuinely converse — the
+begging bird could even dart in to steal the catch. That's the night that pays off Night 19. Other warm
+cousins, all still unbuilt: make the FISHERMAN APPROACHABLE like the lamplighter (Night 15 — turn to nod
+at the cursor-glow); smoke that THICKENS from the lamplighter's chimney once he's home (Night 16 gave him
+a house). Quieter standing notes: WIND TURBULENCE on the smoke so the plumes stop marching in lockstep
+(Night 11 — give each chimney its own wind phase); the far boat LIGHTENING toward the haze color, not just
+fading (Night 10 — truer atmospheric perspective). A bigger structural want is now surfacing (see caveat
+8): so much of the town's life is hour-gated (skim + beg by day, lamplighter at dusk/dawn, fisherman by
+day) that a visitor at the default dusk open sees only a slice — some night may want an ALWAYS-present
+anchor of life that's alive whenever you look. 
 
 CAVEATS for tomorrow-me: (1) The skim glide (Night 17) only fires in DAYLIGHT (when the flock is up),
 one bird at a time, every 7–13s — so a visitor opening the page at DUSK to catch the lamplighter won't
@@ -394,4 +436,12 @@ linger for the sun to climb. The on-page marker says watch by day. More and more
 hour-gated (skim by day, lamplighter at dusk/dawn, fisherman by day) — honest, but piling up; a future
 night might want an always-present anchor of life. (9) The fisherman's cast spawns into the same `ripples[]`
 the visitor stirs (cap 60) — one ring per ~6–11s is gentle, but it's one more source against the cap
-(see caveat 3). Remember to move the "Last night" delta marker + footer to Night 19.
+(see caveat 3). (10) NEW (Night 19): the begging gull only fires in DAYLIGHT while the fisherman is out,
+one bird at a time, every ~11–20s — so like the skim, a dusk visitor won't see it; the on-page marker
+says "watch by day." It's also MUTUALLY EXCLUSIVE with the skim (one special bird at a time), so a skim
+and a beg never overlap — by design (keeps the harbor calm), but it means on a busy-feeling day only one
+of the two gull errands runs at a time. (11) The beg is ONE-SIDED: the fisherman never reacts and never
+has a catch for the gull to want — honest but unfinished; the BITE (NEXT INTENTION) is the other half.
+(12) The hover anchor is `fisher.floatX` (the RESTING float spot, only updated when a cast lands), so a
+begging bird ignores the float mid-cast-arc — calmer, but a livelier version would chase the splash.
+Remember to move the "Last night" delta marker + footer to Night 20.

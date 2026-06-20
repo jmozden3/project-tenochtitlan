@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> a <b>second townsfolk</b> &mdash; a <b>fisherman</b> now sits at the end of the
-    spit through the <b>daylight</b> hours, a rod over the harbor. Every so often he <b>re-casts</b> and
-    the float arcs out and lands with a real ring on the water. He&rsquo;s the lamplighter&rsquo;s opposite
-    number: he packs up at <b>dusk</b> as the lamplighter steps out to light the row. The shore is peopled
-    now from dawn to dark.
+    <b>Last night:</b> the gulls noticed the <b>fisherman</b>. Now and then, by <b>day</b>, a single
+    bird peels off the wheeling flock and <b>comes begging</b> &mdash; it glides down to the spit and
+    circles low and hopeful over his float for a while before giving up and climbing back to the
+    others. The town&rsquo;s oldest creatures finally notice its newest person (as they once flinched
+    from the lamplighter) &mdash; this time out of appetite, not fear. <i>Watch the harbor by day.</i>
   </p>
 
-  <footer>Night 18 &middot; founded 2026-06-02</footer>
+  <footer>Night 19 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -200,6 +200,7 @@
         flapRate: 0.85 + rnd(4) * 0.5,
         air: 0, scatterX: 0, scatterY: 0, startle: 0,
         skim: null,                 // Night 8: set when this bird peels off to skim the sea
+        beg: null,                  // Night 19: set when this bird wheels down to beg at the fisherman
         spookArmed: true,           // Night 14: ready to startle when the lamplighter passes beneath
       });
     }
@@ -1083,15 +1084,45 @@
   };
   let skimTimer = 3500;           // first skim a few seconds after load
 
+  // ---- Night 19: a gull BEGS at the fisherman. The flock notices the town's NEWEST
+  // person (Night 18) the way it noticed the lamplighter (Night 14) — but where that
+  // was a startle (fear of the figure passing beneath), this is APPETITE: one bird
+  // peels off the wheel, flies down to the spit, and loiters hopefully above his
+  // float before giving up and rejoining. It's the same override the skim uses
+  // (Night 8/17) — steering is just aimed at a moving point over the fisherman — so
+  // the fixed-magnitude easing + maxV clamp keep it cruise-stable for free.
+  const BEG = {
+    pull: 2.8,        // how hard the beg target dominates steering (gentler than the skim)
+    hoverY: 42,       // px ABOVE the horizon the bird wheels (over the rod, not in the water)
+    reach: 44,        // within this (px) of the anchor it stops approaching and hovers
+    orbit: 30,        // radius of the hopeful wheel above his float (flattened vertically)
+    dwellMs: 5200,    // how long it loiters before giving up and climbing home
+    every: 11000, jitter: 9000,  // ms between beg attempts (+ random jitter)
+  };
+  let begTimer = 6500;            // first beg a little after load (let the fisher appear)
+
   // Send one eligible bird into a dive: aloft, calm, and only by day (when the
-  // flock is up). Never more than one skim at a time, to keep it a singular event.
+  // flock is up). Never more than one special bird at a time, to keep it singular.
   function tryStartSkim(c) {
     if (c.daylight < 0.45) return;
-    if (gulls.some(g => g.skim)) return;
-    const cand = gulls.filter(g => g.air > 0.85 && g.startle <= 0);
+    if (gulls.some(g => g.skim || g.beg)) return;
+    const cand = gulls.filter(g => g.air > 0.85 && g.startle <= 0 && !g.beg);
     if (!cand.length) return;
     const g = cand[(Math.random() * cand.length) | 0];
     g.skim = { stage: "dive", tx: W * (0.24 + Math.random() * 0.46), ty: town.horizon + SKIM.surfaceY };
+  }
+
+  // Send one eligible bird to beg — only when the fisherman is actually present.
+  // Same singular-event gate as the skim: never while another bird is skimming or
+  // begging, so the harbor never feels busy with peeled-off birds.
+  function tryStartBeg(c) {
+    if (!fisher.active) return;                       // nobody to beg from
+    if (c.daylight < 0.45) return;                    // by day, when the flock is up
+    if (gulls.some(g => g.skim || g.beg)) return;     // one special bird at a time
+    const cand = gulls.filter(g => g.air > 0.85 && g.startle <= 0);
+    if (!cand.length) return;
+    const g = cand[(Math.random() * cand.length) | 0];
+    g.beg = { stage: "approach", dwell: BEG.dwellMs, phase: Math.random() * 6.283 };
   }
 
   function stepGulls(t, dt, c) {
@@ -1099,9 +1130,11 @@
     const dayFly = ss(0.22, 0.5, c.daylight);                // aloft by day
     const N2 = FLOCK.neigh * FLOCK.neigh, S2 = FLOCK.sep * FLOCK.sep;
 
-    // Occasionally send a bird down to skim the sea.
+    // Occasionally send a bird down to skim the sea — or to beg at the fisherman.
     skimTimer -= dt;
     if (skimTimer <= 0) { tryStartSkim(c); skimTimer = SKIM.every + Math.random() * SKIM.jitter; }
+    begTimer -= dt;
+    if (begTimer <= 0) { tryStartBeg(c); begTimer = BEG.every + Math.random() * BEG.jitter; }
 
     // ---- Night 14: the gulls NOTICE the lamplighter. When the figure (Night 13)
     // walks beneath a roosting gull, the bird startles off its roof and lifts toward
@@ -1197,6 +1230,33 @@
           }
         } else if (sk.stage === "climb" && g.fy < town.horizon - 50) {
           g.skim = null;                                     // back in the sky; rejoin the flock
+        }
+      }
+      // ---- Night 19: a begging bird abandons the flock and wheels over the fisherman.
+      // A startle cancels it (fear beats appetite); if he packs up at dusk, it gives up
+      // and rejoins. Like the skim, the override REPLACES the boids steering — but with
+      // no extra cruise, so it lingers low and hopeful rather than committing like a dive.
+      if (g.beg && (g.startle > 0 || !fisher.active)) g.beg = null;
+      if (g.beg) {
+        const bg = g.beg;
+        const ax = fisher.floatX, ay = town.horizon - BEG.hoverY;   // anchor above his float
+        if (bg.stage === "approach") {
+          const adx = ax - g.fx, ady = ay - g.fy, ad = Math.hypot(adx, ady) || 1;
+          dirX = (adx / ad) * BEG.pull; dirY = (ady / ad) * BEG.pull;
+          if (ad < BEG.reach) bg.stage = "hover";            // arrived — start wheeling
+        } else if (bg.stage === "hover") {
+          bg.dwell -= dt;
+          // Chase a point WHEELING around the anchor, so the bird circles hopefully
+          // (a flattened ellipse, like the flock's own wheel — dips toward the water).
+          const wx = ax + Math.cos(t * 0.004 + bg.phase) * BEG.orbit;
+          const wy = ay + Math.sin(t * 0.004 + bg.phase) * BEG.orbit * 0.5;
+          const wdx = wx - g.fx, wdy = wy - g.fy, wd = Math.hypot(wdx, wdy) || 1;
+          dirX = (wdx / wd) * BEG.pull; dirY = (wdy / wd) * BEG.pull;
+          if (bg.dwell <= 0) bg.stage = "leave";             // gave up — climb home
+        } else {                                             // leave: back up to the flock
+          const lx = wheelCenter.x - g.fx, ly = wheelCenter.y - g.fy, ld = Math.hypot(lx, ly) || 1;
+          dirX = (lx / ld) * BEG.pull; dirY = (ly / ld) * BEG.pull;
+          if (g.fy < town.horizon - 95 || ld < 60) g.beg = null;   // rejoined the flock
         }
       }
       // Desired velocity: fixed magnitude, in the blended direction.

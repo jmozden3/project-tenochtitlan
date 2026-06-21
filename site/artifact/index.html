@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the gulls noticed the <b>fisherman</b>. Now and then, by <b>day</b>, a single
-    bird peels off the wheeling flock and <b>comes begging</b> &mdash; it glides down to the spit and
-    circles low and hopeful over his float for a while before giving up and climbing back to the
-    others. The town&rsquo;s oldest creatures finally notice its newest person (as they once flinched
-    from the lamplighter) &mdash; this time out of appetite, not fear. <i>Watch the harbor by day.</i>
+    <b>Last night:</b> the fisherman gets a <b>bite</b>. Now and then his float jerks sharply
+    under &mdash; a fish on the line, ringing the water &mdash; and he <b>reels a small catch</b> up
+    out of the sea to his rod. And if a gull happens to be <b>begging</b> overhead when it breaks the
+    surface, the bird will <b>dart in and steal it</b> off the hook, leaving his line bare. The man,
+    the bird and the water finally converse. <i>Watch the harbor by day.</i>
   </p>
 
-  <footer>Night 19 &middot; founded 2026-06-02</footer>
+  <footer>Night 20 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -694,20 +694,39 @@
     castMs: 1050,                              // how long the float's arc takes
     every: 6500, jitter: 4500,                 // ms between casts (+ random jitter)
   };
-  const fisher = { active: false, x: 0, y: 0, floatX: FISH.restX, floatY: FISH.restY };
+  // Night 20: the BITE. While the float rests, a fish now and then takes the line —
+  // it twitches sharply under (ringing the water), then he hooks it and reels a small
+  // catch up out of the sea to the rod tip. The catch is published on `fisher.catch`
+  // so a begging gull (Night 19) can dart in and STEAL it — the payoff that finally
+  // makes the bird, the man and the water converse.
+  const BITE = {
+    every: 8500, jitter: 7000,                 // ms between bites while resting (+ jitter)
+    nibbleMs: 850,                             // the telegraph — float yanks under
+    reelMs: 950,                               // reeling the catch up to the rod
+    dip: 7,                                    // px the float jerks below the surface
+  };
+  // `catch` is null except during a reel, when it carries the rising fish's live
+  // {x,y,taken} — `taken` flips true the instant a gull snatches it off the line.
+  const fisher = { active: false, x: 0, y: 0, floatX: FISH.restX, floatY: FISH.restY, catch: null };
   let castT = -1;                              // -1 resting; ≥0 = ms elapsed into a cast
   let castTimer = 1800;                        // until the first cast after he arrives
   let castTargetX = FISH.restX;               // this cast's landing x (varied a little)
+  let biteT = -1;                              // -1 = no bite; ≥0 = ms into a bite (nibble→reel)
+  let biteTimer = 5200;                        // ms until a fish next takes the resting line
+  let lastBiteRing = 0;                        // throttles the nibble's water-rings
   function drawFisher(t, dt, c) {
     // A daytime presence: fades in as the morning brightens, out as dusk falls —
     // the inverse of the lamplighter's dusk/dawn band, so they share the shore only
     // briefly at the handoff.
     const presence = ss(0.55, 0.82, c.daylight);
-    if (presence < 0.02) { fisher.active = false; castT = -1; castTimer = 1800; return; }
+    if (presence < 0.02) {
+      fisher.active = false; castT = -1; castTimer = 1800;
+      biteT = -1; biteTimer = 5200; fisher.catch = null;
+      return;
+    }
     fisher.active = true;
 
     const fx = FISH.x, fy = town.horizon - 2;            // seated on the spit's edge
-    const rodTipX = fx + 24, rodTipY = fy - 22;          // the rod held out over the water
     fisher.x = fx; fisher.y = fy;
 
     // Advance the cast cycle. Resting → wait out the timer → arc the float out → land.
@@ -716,6 +735,34 @@
       castT = 0;
       castTargetX = FISH.restX + (Math.random() - 0.5) * 44;   // a different spot each time
     }
+
+    // Night 20: while the float rests, a fish may take the line. The bite runs as a
+    // bounded two-stage timer (nibble → reel) — no integrator, the boats'/cast's calm.
+    let nibbling = false, reeling = false;
+    if (castT < 0) {
+      if (biteT < 0) {
+        biteTimer -= dt;
+        if (biteTimer <= 0 && presence > 0.7) { biteT = 0; lastBiteRing = -1e4; fisher.catch = null; }
+      }
+      if (biteT >= 0) {
+        biteT += dt;
+        if (biteT < BITE.nibbleMs) nibbling = true;
+        else if (biteT < BITE.nibbleMs + BITE.reelMs) reeling = true;
+        else {
+          // Landed (or lost to a gull): reel done — cast the line straight back out,
+          // continuing smoothly from the rod tip the float was just drawn up to.
+          biteT = -1;
+          biteTimer = BITE.every + Math.random() * BITE.jitter;
+          fisher.catch = null;
+          castT = 0;
+          castTargetX = FISH.restX + (Math.random() - 0.5) * 44;
+        }
+      }
+    }
+
+    // The rod lifts a touch while he plays the fish in.
+    const rodTipX = fx + 24, rodTipY = fy - 22 - (reeling ? 7 : 0);
+
     let floatX, floatY;
     if (castT >= 0) {
       castT += dt;
@@ -727,6 +774,23 @@
         fisher.floatX = castTargetX; fisher.floatY = FISH.restY;
         castT = -1;
         castTimer = FISH.every + Math.random() * FISH.jitter;
+      }
+    } else if (nibbling) {
+      // The float jerks sharply under, ringing the surface on each tug.
+      floatX = fisher.floatX;
+      floatY = fisher.floatY + Math.max(0, Math.sin(biteT * 0.02)) * BITE.dip;
+      if (biteT - lastBiteRing > 200) { spawnRipple(floatX, fisher.floatY, 0.35); lastBiteRing = biteT; }
+    } else if (reeling) {
+      // He hooks it: the catch is drawn up out of the water toward the rod tip.
+      const rp = (biteT - BITE.nibbleMs) / BITE.reelMs;
+      floatX = lerp(fisher.floatX, rodTipX, rp);
+      floatY = lerp(fisher.floatY, rodTipY, rp);
+      if (!fisher.catch) {                                    // the hook sets — breaks the surface
+        fisher.catch = { x: floatX, y: floatY, taken: false };
+        spawnRipple(fisher.floatX, fisher.floatY, 0.5);
+        spawnGlint(fisher.floatX, fisher.floatY);
+      } else if (!fisher.catch.taken) {
+        fisher.catch.x = floatX; fisher.catch.y = floatY;    // publish the live catch for the gulls
       }
     } else {
       floatX = fisher.floatX;
@@ -771,6 +835,18 @@
     }
     ctx.fillStyle = "rgba(234,120,92,0.95)";
     ctx.beginPath(); ctx.arc(floatX, floatY, 1.7, 0, Math.PI * 2); ctx.fill();
+
+    // Night 20: the catch — a small silver fish on the line as it's reeled up. It
+    // vanishes the instant a gull snatches it (fisher.catch.taken), leaving the line bare.
+    if (reeling && fisher.catch && !fisher.catch.taken) {
+      ctx.fillStyle = "rgba(206,215,226,0.95)";
+      ctx.beginPath(); ctx.ellipse(floatX, floatY + 3, 3.2, 1.7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();                                    // a flick of tail
+      ctx.moveTo(floatX - 3, floatY + 3);
+      ctx.lineTo(floatX - 5.4, floatY + 1.3);
+      ctx.lineTo(floatX - 5.4, floatY + 4.7);
+      ctx.closePath(); ctx.fill();
+    }
 
     ctx.restore();
   }
@@ -1240,7 +1316,20 @@
       if (g.beg) {
         const bg = g.beg;
         const ax = fisher.floatX, ay = town.horizon - BEG.hoverY;   // anchor above his float
-        if (bg.stage === "approach") {
+        if (fisher.catch && !fisher.catch.taken && bg.stage !== "leave") {
+          // Night 20: a catch broke the surface — forget hovering and DART in to steal
+          // it off the line. Reuses the skim's strong pull + a dive's commitment boost;
+          // reach it first and the fisherman comes up empty (the bird wins the fish).
+          const cx = fisher.catch.x, cy = fisher.catch.y;
+          const sdx = cx - g.fx, sdy = cy - g.fy, sd = Math.hypot(sdx, sdy) || 1;
+          dirX = (sdx / sd) * SKIM.pull; dirY = (sdy / sd) * SKIM.pull;
+          cruise += 26;
+          if (sd < 16) {
+            fisher.catch.taken = true;                       // snatched off the hook!
+            spawnRipple(cx, cy, 0.5); spawnGlint(cx, cy);
+            bg.stage = "leave";                              // climb off with the prize
+          }
+        } else if (bg.stage === "approach") {
           const adx = ax - g.fx, ady = ay - g.fy, ad = Math.hypot(adx, ady) || 1;
           dirX = (adx / ad) * BEG.pull; dirY = (ady / ad) * BEG.pull;
           if (ad < BEG.reach) bg.stage = "hover";            // arrived — start wheeling

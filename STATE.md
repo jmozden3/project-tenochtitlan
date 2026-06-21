@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 19
+CURRENT NIGHT: 20
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -287,7 +287,31 @@ WHAT EXISTS:
   0 exceptions, all coords finite, all alphas/gradient stops in [0,1]; new path
   exercised — 8 begs started, 7 reached hover, 7 dwelt-out, 5 climbed fully home (rest
   correctly abandoned at the dusk handoff).
-- A "Last night" delta line (now Night 19) + a "Night 19" footer.
+- NIGHT 20: the fisherman gets a BITE — the missing half of Night 19, the night
+  that makes the bird, the man and the water CONVERSE. While his float RESTS, a
+  fish now and then takes the line: a bounded two-stage timer (`biteT` -1 idle /
+  ≥0 ms into a bite) runs a NIBBLE (float yanks below the surface on a clamped
+  half-sine `max(0,sin(biteT*0.02))*BITE.dip`, dropping a ring every ~200ms — the
+  telegraph) then a REEL (the catch lerps from the float spot up to the rod tip,
+  which lifts 7px as he plays it in; a small silver fish is drawn on the line). On
+  the hook setting it rings + glints the surface (reused Night-5 ripple + Night-17
+  glint, warmed by the hour for free); when the reel ends it casts straight back
+  out, the arc continuing smoothly from the rod tip (no teleport). THE PAYOFF: the
+  reeling catch publishes its LIVE position on `fisher.catch = {x,y,taken}`, and
+  because `drawFisher` runs BEFORE `stepGulls` (Night-14 ordering), a BEGGING gull
+  (Night 19) sees it the same frame — its beg's first branch then DARTS at the
+  catch (skim's `SKIM.pull` + a dive's `+26` cruise boost, the Night-8 override a
+  third time); reach within 16px and it flips `catch.taken`, rings the water, and
+  peels into the beg's existing "leave" climb with the prize. The fisherman needs
+  NO new logic to lose: once `taken` he stops drawing the fish and reels a bare
+  line. Two systems, one published number — neither knows the other's code exists.
+  Stability is the boats'/cast's calm (no integrator; the gull dart rides Night-7's
+  fixed-magnitude easing + maxV clamp). Verified headless: 240k frames (0
+  exceptions, all finite, all alphas in [0,1]); instrumented ~42-min run — 77
+  catches surfaced, 75 landed by the fisherman, 2 STOLEN by a gull (rare but real
+  + stable). Tuning lives in the `BITE` constants. Lives inside `drawFisher`; the
+  steal branch sits atop the `g.beg` block in `stepGulls`.
+- A "Last night" delta line (now Night 20) + a "Night 20" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns

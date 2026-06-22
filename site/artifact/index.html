@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the fisherman gets a <b>bite</b>. Now and then his float jerks sharply
-    under &mdash; a fish on the line, ringing the water &mdash; and he <b>reels a small catch</b> up
-    out of the sea to his rod. And if a gull happens to be <b>begging</b> overhead when it breaks the
-    surface, the bird will <b>dart in and steal it</b> off the hook, leaving his line bare. The man,
-    the bird and the water finally converse. <i>Watch the harbor by day.</i>
+    <b>Last night:</b> a <b>harbor cat</b> &mdash; the town's first <b>always-present</b> life. It
+    prowls the spit at <i>every</i> hour, day or night, pausing to sit and then sauntering on. Bring
+    your cursor-lantern near and it <b>stops to watch the light</b>, ears up, tail lifting; and its
+    eyes <b>catch the dark</b> so you can always find it. <i>No need to wait for the right hour &mdash;
+    it's there whenever you arrive.</i>
   </p>
 
-  <footer>Night 20 &middot; founded 2026-06-02</footer>
+  <footer>Night 21 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -851,6 +851,122 @@
     ctx.restore();
   }
 
+  // ---- Night 21: the HARBOR CAT — the town's first ALWAYS-PRESENT life, and its
+  // first land creature. For twenty nights every *intimate* thing has been hour-gated:
+  // the lamplighter at dusk/dawn, the fisherman and the gull errands by day, the
+  // lanternfall at nightfall. A visitor who opened the page at the wrong hour caught
+  // only a thin slice; the journal has muttered about it for three nights. So tonight
+  // a small cat prowls the spit at EVERY hour — day, dusk, night, dawn — a heartbeat
+  // you can't miss whenever you arrive. It saunters the cottage shore, pauses to sit,
+  // then picks a new spot; and when your cursor-lantern comes near it STOPS and turns
+  // to watch the light (cats and lights — the Night-15 'attend' pattern, for a creature
+  // this time, ears perking and tail lifting). Its eyes catch the dark so it's always
+  // findable at night. No integrator: it walks a bounded patrol toward a target at a
+  // fixed speed, its gait a pure function of distance walked (never moonwalks, like the
+  // lamplighter), so stability is the boats'/people's calm, not the flock's.
+  const CAT = {
+    y: town.horizon + 14,                 // pads the spit edge, just at the waterline
+    minX: W * 0.07, maxX: W * 0.56,       // its patrol along the cottage shore
+    speed: 0.020,                         // px/ms — a slow saunter
+    sitMin: 2800, sitMax: 6500,           // how long it pauses between strolls (ms)
+  };
+  const cat = {
+    x: W * 0.32, target: W * 0.12, facing: -1,
+    state: "walk", timer: 0, step: 0, attend: 0,
+  };
+  function drawCat(t, dt, c) {
+    // Does it notice the visitor's carried light? (the Night-15 lamplighter pattern)
+    let prox = 0;
+    if (pointer.inside) prox = Math.max(0, 1 - Math.hypot(pointer.x - cat.x, pointer.y - CAT.y) / 115);
+    cat.attend += (prox - cat.attend) * Math.min(1, dt * 0.005);
+    const att = cat.attend;
+
+    // Wander: walk to a target, sit a while, pick another — unless it's watching you.
+    let moving = 0;
+    if (att < 0.4) {
+      if (cat.state === "walk") {
+        const dx = cat.target - cat.x;
+        const dir = Math.sign(dx) || cat.facing;
+        const stepPx = Math.min(Math.abs(dx), CAT.speed * dt);
+        cat.x += dir * stepPx; cat.step += stepPx; cat.facing = dir;
+        moving = ss(1, 26, Math.abs(dx));            // eases to a stop near the target
+        if (Math.abs(dx) < 1.5) {                    // arrived — settle and sit a while
+          cat.state = "sit";
+          cat.timer = CAT.sitMin + Math.random() * (CAT.sitMax - CAT.sitMin);
+        }
+      } else {
+        cat.timer -= dt;
+        if (cat.timer <= 0) {                        // rested enough — pick a new spot
+          cat.target = CAT.minX + Math.random() * (CAT.maxX - CAT.minX);
+          cat.state = "walk";
+        }
+      }
+    } else if (pointer.inside) {
+      cat.facing = Math.sign(pointer.x - cat.x) || cat.facing;   // turn to face your light
+    }
+
+    const tone = lerpC([150,160,180], [44,48,60], c.daylight);   // visible at night, dark by day
+    const ts = `${tone[0]|0},${tone[1]|0},${tone[2]|0}`;
+    const f = cat.facing;
+    const bob  = Math.abs(Math.sin(cat.step * 0.06)) * 1.0 * moving;
+    const gait = Math.sin(cat.step * 0.06) * moving;
+    const tailLift = (1 - moving) * 3.5 + att * 5;               // upright at rest, alert when watching
+
+    ctx.save();
+    ctx.translate(cat.x, CAT.y - bob);
+    ctx.scale(f, 1);                                             // flip to face its heading
+
+    // Tail — the unmistakable cat signal: a curving stroke that sways and lifts.
+    ctx.strokeStyle = `rgba(${ts},0.95)`;
+    ctx.lineCap = "round";
+    ctx.lineWidth = 2;
+    const sway = Math.sin(t * 0.0038 + cat.step * 0.03) * (2.5 + att * 3);
+    ctx.beginPath();
+    ctx.moveTo(-10.5, -5);
+    ctx.quadraticCurveTo(-15, -5 - tailLift, -12 + sway, -10 - tailLift);
+    ctx.stroke();
+
+    // Legs — front and back pairs, striding with the gait.
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(1.5, -4.5);   ctx.lineTo(1.5 + gait * 2, 0);
+    ctx.moveTo(-0.5, -4.5);  ctx.lineTo(-0.5 - gait * 2, 0);
+    ctx.moveTo(-8.5, -4.5);  ctx.lineTo(-8.5 - gait * 2, 0);
+    ctx.moveTo(-10.5, -4.5); ctx.lineTo(-10.5 + gait * 2, 0);
+    ctx.stroke();
+
+    // Body — a low horizontal torso with rounded hindquarters.
+    ctx.fillStyle = `rgba(${ts},0.97)`;
+    ctx.beginPath(); ctx.ellipse(-5, -6, 7.2, 3.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-9, -6, 3.8, 3.8, 0, 0, Math.PI * 2); ctx.fill();   // haunch
+
+    // Shoulder up to the head.
+    ctx.beginPath();
+    ctx.moveTo(0, -8.5);
+    ctx.quadraticCurveTo(3.5, -8, 4, -9.5);
+    ctx.lineTo(2, -5); ctx.closePath();
+    ctx.fill();
+    // Head.
+    ctx.beginPath(); ctx.arc(4, -10, 2.7, 0, Math.PI * 2); ctx.fill();
+    // Ears — two triangles, perking when it watches you.
+    const eb = -12.2 - att * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(2.4, eb + 1.6); ctx.lineTo(2.7, eb - 1.4); ctx.lineTo(4.1, eb + 0.8); ctx.closePath();
+    ctx.moveTo(4.2, eb + 0.8); ctx.lineTo(5.6, eb - 1.4); ctx.lineTo(5.9, eb + 1.6); ctx.closePath();
+    ctx.fill();
+
+    // Eye-shine — two catchlights so the cat is always findable in the dark
+    // (brightest at night, the always-present heartbeat made legible).
+    const shine = 0.2 + 0.8 * c.nightness;
+    if (shine > 0.02) {
+      ctx.fillStyle = `rgba(196,224,150,${Math.min(1, 0.65 * shine)})`;
+      ctx.fillRect(3.2, -10.7, 1.0, 1.0);
+      ctx.fillRect(4.9, -10.7, 1.0, 1.0);
+    }
+
+    ctx.restore();
+  }
+
   function drawBoats(list, t, c) {
     const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
@@ -1445,6 +1561,7 @@
     drawSmoke(town.buildings, t, c);       // Night 11 — plumes rise from lit hearths
     drawLamplighter(t, dt, c);             // Night 13/15 — walks the shore; pauses to greet the visitor
     drawFisher(t, dt, c);                  // Night 18 — a daytime soul casting from the spit
+    drawCat(t, dt, c);                     // Night 21 — the always-present cat prowling the spit
     drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
     drawLighthouse(town.lighthouse, t, c);
     stepGulls(t, dt, c);

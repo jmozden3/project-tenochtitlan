@@ -3,7 +3,7 @@
 PROJECT: Lanternfall — a small harbor town at dusk, rendered on an animated
 HTML canvas, that grows by one considered addition each night.
 NAME: Lanternfall (chosen Night 1 — keep forever).
-CURRENT NIGHT: 21
+CURRENT NIGHT: 22
 
 WHAT EXISTS:
 - A single self-contained page at `site/artifact/index.html` (no build, no deps).
@@ -332,7 +332,30 @@ WHAT EXISTS:
   the cursor parked on the cat (watch path forced), 0 exceptions, all coords finite,
   all rgba alphas in [0,1]; wander exercised (both states, 5 targets, 4 sits, attend
   hits 1.0).
-- A "Last night" delta line (now Night 21) + a "Night 21" footer.
+- NIGHT 22: the cat WATCHES THE GULLS — the town's newest life (cat, Night 21)
+  notices its oldest (the flock, Night 6), the first time it touches the world
+  beyond the visitor. Each frame `drawCat` scans `gulls[]` for the most
+  interesting LOW bird — scored `low * near`, where `low = ss(horizon-80, horizon,
+  g.y)` (~0 for the wheeling flock high up, ~1 for a bird at the waterline) and
+  `near = 1 - dist(g, cat)/220`. The dramatic case is the SKIM (Night 8/17): a
+  gull kissing the water near the shore is prey to a shore cat. Reaction reuses
+  the Night-15 `attend` pattern: two new eased fields on `cat`, `gaze` (toward the
+  watched bird, freezes the wander + turns the cat to face it) and `crouch` (gated
+  on a higher score `ss(0.34,0.7,watchScore)` — a bird LOW AND CLOSE earns a
+  hunting stalk: body sinks `crouch*2.5`, tail drops `-crouch*7` and LASHES on a
+  fast `sin(t*0.016)*crouch*5`, ears perk, eyes lock bright). The visitor wins
+  ties: both `gaze`/`crouch` scale by `(1-att)`, so a hovering cursor pulls the
+  cat's attention back to your light. DAYTIME-FOR-FREE: not gated to day in code,
+  gated to LOW birds — but the flock only flies/skims by day and roosts ABOVE the
+  horizon at night (low score 0), so the cat is alert/hunting through the bright
+  hours and quiet at night, with no `if(daytime)`. `drawCat` runs before
+  `stepGulls`, so it reads last frame's gull positions (the Night-14
+  published-position trick). No integrator → boats'/people's stability. Verified
+  headless: 60k frames with a moving in-scene pointer (0 exceptions, all coords
+  finite, all rgba alphas in [0,1]) + a 120k-frame (~33min) run with NO pointer to
+  prove the path fires autonomously — gaze reached 0.97, crouch 1.0, watching ~12.8k
+  frames + stalking ~10k frames, all in daylight, none at night.
+- A "Last night" delta line (now Night 22) + a "Night 22" footer.
 
 ARCHITECTURE NOTES (for future me):
 - THE CLOCK (Night 4): `clock(t)` is the master driver. It returns
@@ -459,23 +482,34 @@ ARCHITECTURE NOTES (for future me):
   Night-14 published-position trick), or read `fisher.active/x` to sit by the fisherman, or
   `spawnRipple`-chase the skim-splash at the waterline. To give it a real sitting pose, morph
   the body off a `sit` factor (fragile at 15px — tail-lift currently signals rest instead).
+- Cat watches gulls (Night 22): `drawCat` now scans `gulls[]` for the lowest+nearest bird and
+  eases two new `cat` fields toward it — `gaze` (watch: freeze wander + face the bird) and
+  `crouch` (stalk: body sinks, tail drops + lashes). The LOW-BIRD GATE is the key idea:
+  `low = ss(town.horizon-80, town.horizon, g.y)` IS the whole day/night choreography for free —
+  roosting birds sit above the horizon (low=0), only flying/skimming birds by day score, so the
+  cat is alert by day and quiet at night with no `if(daytime)`. Visitor priority is `*(1-att)` on
+  both. To give the watch a RESOLUTION, add a POUNCE: when watchScore is very high, lunge the cat
+  a few px toward the bird (mind the return-to-rest), and optionally fire a Night-6
+  `startle`/`scatter` on that gull so the cat finally disturbs the flock from the ground (Night-14
+  inverted). To widen what it tracks, raise the `low` band's top toward the wheel; to make it sit
+  by the fisherman, branch on `fisher.active`.
 
-NEXT INTENTION: the ALWAYS-PRESENT anchor (the structural want of Nights 18–20) is now BUILT — the
-harbor cat (Night 21) lives on the shore at every hour. So the cat's own open thread is the strongest
-next reach: make it TOUCH the rest of the world rather than only the visitor. Every other creature here
-eventually got this (the gull skims the water Night 8, fears the lamplighter Night 14, begs the fisherman
-Night 19). The cat should WATCH the gulls — track a low-skimming or roosting bird with its head, crouch/
-freeze when one drops near the shore (read `gulls[]` via the Night-14 published-position trick) — or SIT
-beside the fisherman by day (read `fisher.active/x`; cats and fishermen, a free loose association since
-both are on the spit when he's out), or even chase the skim-splash at the waterline. Any of these turns
-the cat from an always-present presence into an always-present participant — the first time the town's
-NEWEST life notices its OLDEST. Other warm cousins, all still unbuilt: make the FISHERMAN APPROACHABLE
-like the lamplighter (Night 15 — turn to nod at the cursor-glow); the OPPORTUNISTIC SWOOP to make the
-gull's fish-theft less rare (Night 20 — let a surfacing catch summon a nearby eligible gull even when
-none was already begging); smoke that THICKENS from the lamplighter's chimney once he's home (Night 16
-gave him a house). Quieter standing notes: WIND TURBULENCE on the smoke so the plumes stop marching in
-lockstep (Night 11 — give each chimney its own wind phase); the far boat LIGHTENING toward the haze
-color, not just fading (Night 10 — truer atmospheric perspective).
+NEXT INTENTION: the cat now WATCHES the gulls (Night 22) but the loop is one-sided — it stalks and the
+bird never knows. The strongest next reach is the POUNCE: when a gull skims VERY close, let the cat lunge
+a few px toward it (the crouch's resolution), and — once in a great while — fire a Night-6 `startle`/
+`scatter` on that gull so the cat finally DISTURBS the flock from the ground (Night-14 inverted: the
+lamplighter spooks roosting birds, the cat spooks a low-skimming one). That would turn the cat from a
+WATCHER of the flock into a PARTICIPANT in it, closing the loop Night 22 left open. Watch the
+return-to-rest: a lunge is a bigger motion than the crouch and needs to ease back without snapping. Other
+warm cousins for the cat, all still unbuilt: SIT BESIDE THE FISHERMAN by day (read `fisher.active/x`; cats
+and fishermen, a free loose association since both are on the spit when he's out), or chase the skim-splash
+at the waterline. Beyond the cat: make the FISHERMAN APPROACHABLE like the lamplighter (Night 15 — turn to
+nod at the cursor-glow); the OPPORTUNISTIC SWOOP to make the gull's fish-theft less rare (Night 20 — let a
+surfacing catch summon a nearby eligible gull even when none was already begging); smoke that THICKENS from
+the lamplighter's chimney once he's home (Night 16 gave him a house). Quieter standing notes: WIND
+TURBULENCE on the smoke so the plumes stop marching in lockstep (Night 11 — give each chimney its own wind
+phase); the far boat LIGHTENING toward the haze color, not just fading (Night 10 — truer atmospheric
+perspective).
 
 CAVEATS for tomorrow-me: (1) The skim glide (Night 17) only fires in DAYLIGHT (when the flock is up),
 one bird at a time, every 7–13s — so a visitor opening the page at DUSK to catch the lamplighter won't

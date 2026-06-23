@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> a <b>harbor cat</b> &mdash; the town's first <b>always-present</b> life. It
-    prowls the spit at <i>every</i> hour, day or night, pausing to sit and then sauntering on. Bring
-    your cursor-lantern near and it <b>stops to watch the light</b>, ears up, tail lifting; and its
-    eyes <b>catch the dark</b> so you can always find it. <i>No need to wait for the right hour &mdash;
-    it's there whenever you arrive.</i>
+    <b>Last night:</b> the <b>cat watches the gulls</b> &mdash; the town's newest life finally notices
+    its oldest. A low bird passing near the shore stops the cat mid-stroll: it <b>turns to track it</b>,
+    ears forward, eyes locked. And when a gull <b>skims the water</b> close by, the cat drops into a
+    <b>hunting crouch</b>, tail lashing low. <i>Watch by day, when the flock is up and skimming &mdash;
+    keep the cursor away and let the cat mind the birds.</i>
   </p>
 
-  <footer>Night 21 &middot; founded 2026-06-02</footer>
+  <footer>Night 22 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -873,6 +873,7 @@
   const cat = {
     x: W * 0.32, target: W * 0.12, facing: -1,
     state: "walk", timer: 0, step: 0, attend: 0,
+    gaze: 0, crouch: 0,                   // Night 22: watching / stalking a low gull
   };
   function drawCat(t, dt, c) {
     // Does it notice the visitor's carried light? (the Night-15 lamplighter pattern)
@@ -881,9 +882,33 @@
     cat.attend += (prox - cat.attend) * Math.min(1, dt * 0.005);
     const att = cat.attend;
 
-    // Wander: walk to a target, sit a while, pick another — unless it's watching you.
+    // ---- Night 22: the cat WATCHES THE GULLS. The town's newest life (the cat,
+    // Night 21) finally notices its oldest (the flock, Night 6) — and the moment
+    // that matters is the SKIM (Night 8/17): a gull dropping to kiss the water is
+    // prey to a shore cat. Each frame it scans `gulls[]` for the most interesting
+    // LOW bird — one down near the waterline AND nearby. (drawCat runs before
+    // stepGulls, so it reads last frame's gull positions: a frame stale, plenty
+    // fresh for a gaze, and the Night-14 published-position trick by another name.)
+    // The visitor's own carried light still takes priority, so a hovering cursor
+    // wins the cat's attention over a distant bird.
+    let watchG = null, watchScore = 0;
+    for (const g of gulls) {
+      const low = ss(town.horizon - 80, town.horizon, g.y);    // 0 high in the sky → 1 at the water
+      if (low < 0.04) continue;
+      const near = Math.max(0, 1 - Math.hypot(g.x - cat.x, g.y - CAT.y) / 220);
+      const score = low * near;
+      if (score > watchScore) { watchScore = score; watchG = g; }
+    }
+    const wantGaze   = watchG ? watchScore * (1 - att) : 0;                  // attend to the cursor first
+    const wantCrouch = watchG ? ss(0.34, 0.7, watchScore) * (1 - att) : 0;   // close + low ⇒ a hunting stalk
+    cat.gaze   += (wantGaze   - cat.gaze)   * Math.min(1, dt * 0.005);
+    cat.crouch += (wantCrouch - cat.crouch) * Math.min(1, dt * 0.006);
+    const gaze = cat.gaze, crouch = cat.crouch;
+
+    // Wander: walk to a target, sit a while, pick another — unless it's watching
+    // YOU or fixated on a low gull (either one freezes the stroll).
     let moving = 0;
-    if (att < 0.4) {
+    if (att < 0.4 && gaze < 0.4) {
       if (cat.state === "walk") {
         const dx = cat.target - cat.x;
         const dir = Math.sign(dx) || cat.facing;
@@ -901,8 +926,10 @@
           cat.state = "walk";
         }
       }
-    } else if (pointer.inside) {
+    } else if (att >= 0.4 && pointer.inside) {
       cat.facing = Math.sign(pointer.x - cat.x) || cat.facing;   // turn to face your light
+    } else if (watchG) {
+      cat.facing = Math.sign(watchG.x - cat.x) || cat.facing;    // turn to track the bird
     }
 
     const tone = lerpC([150,160,180], [44,48,60], c.daylight);   // visible at night, dark by day
@@ -910,17 +937,20 @@
     const f = cat.facing;
     const bob  = Math.abs(Math.sin(cat.step * 0.06)) * 1.0 * moving;
     const gait = Math.sin(cat.step * 0.06) * moving;
-    const tailLift = (1 - moving) * 3.5 + att * 5;               // upright at rest, alert when watching
+    // Upright/alert at rest and when watching you; DROPS low when stalking a bird.
+    const tailLift = (1 - moving) * 3.5 + att * 5 + gaze * 2 - crouch * 7;
 
     ctx.save();
-    ctx.translate(cat.x, CAT.y - bob);
+    ctx.translate(cat.x, CAT.y - bob + crouch * 2.5);            // body sinks into a crouch
     ctx.scale(f, 1);                                             // flip to face its heading
 
-    // Tail — the unmistakable cat signal: a curving stroke that sways and lifts.
+    // Tail — the unmistakable cat signal: a curving stroke that sways and lifts,
+    // and LASHES fast and low when the cat has locked onto prey (Night 22).
     ctx.strokeStyle = `rgba(${ts},0.95)`;
     ctx.lineCap = "round";
     ctx.lineWidth = 2;
-    const sway = Math.sin(t * 0.0038 + cat.step * 0.03) * (2.5 + att * 3);
+    const lash = Math.sin(t * 0.016) * crouch * 5;
+    const sway = Math.sin(t * 0.0038 + cat.step * 0.03) * (2.5 + att * 3) + lash;
     ctx.beginPath();
     ctx.moveTo(-10.5, -5);
     ctx.quadraticCurveTo(-15, -5 - tailLift, -12 + sway, -10 - tailLift);
@@ -949,7 +979,7 @@
     // Head.
     ctx.beginPath(); ctx.arc(4, -10, 2.7, 0, Math.PI * 2); ctx.fill();
     // Ears — two triangles, perking when it watches you.
-    const eb = -12.2 - att * 1.5;
+    const eb = -12.2 - (att + gaze) * 1.5;                       // ears perk forward when fixated
     ctx.beginPath();
     ctx.moveTo(2.4, eb + 1.6); ctx.lineTo(2.7, eb - 1.4); ctx.lineTo(4.1, eb + 0.8); ctx.closePath();
     ctx.moveTo(4.2, eb + 0.8); ctx.lineTo(5.6, eb - 1.4); ctx.lineTo(5.9, eb + 1.6); ctx.closePath();
@@ -957,7 +987,7 @@
 
     // Eye-shine — two catchlights so the cat is always findable in the dark
     // (brightest at night, the always-present heartbeat made legible).
-    const shine = 0.2 + 0.8 * c.nightness;
+    const shine = 0.2 + 0.8 * c.nightness + gaze * 0.5;         // and the eyes lock bright on the bird
     if (shine > 0.02) {
       ctx.fillStyle = `rgba(196,224,150,${Math.min(1, 0.65 * shine)})`;
       ctx.fillRect(3.2, -10.7, 1.0, 1.0);

@@ -54,14 +54,14 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>cat watches the gulls</b> &mdash; the town's newest life finally notices
-    its oldest. A low bird passing near the shore stops the cat mid-stroll: it <b>turns to track it</b>,
-    ears forward, eyes locked. And when a gull <b>skims the water</b> close by, the cat drops into a
-    <b>hunting crouch</b>, tail lashing low. <i>Watch by day, when the flock is up and skimming &mdash;
-    keep the cursor away and let the cat mind the birds.</i>
+    <b>Last night:</b> the <b>cat pounces</b> &mdash; the stalk finally has a payoff. When a gull
+    <b>skims the water close by</b>, the crouching cat <b>springs at it</b>; and if the bird crosses
+    right past its nose, the pounce <b>spooks the gull off the water</b> &mdash; it bolts up to the
+    flock, skim abandoned. The cat at last <b>touches the flock</b> from the ground.
+    <i>Watch by day, when the flock is up and skimming &mdash; keep the cursor away and let the cat hunt.</i>
   </p>
 
-  <footer>Night 22 &middot; founded 2026-06-02</footer>
+  <footer>Night 23 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -869,11 +869,14 @@
     minX: W * 0.07, maxX: W * 0.56,       // its patrol along the cottage shore
     speed: 0.020,                         // px/ms — a slow saunter
     sitMin: 2800, sitMax: 6500,           // how long it pauses between strolls (ms)
+    pounceAt: 0.62,                       // Night 23: stalk-score that triggers a spring
+    pounceReach: 34,                      // px: bird this close gets actually spooked
   };
   const cat = {
     x: W * 0.32, target: W * 0.12, facing: -1,
     state: "walk", timer: 0, step: 0, attend: 0,
     gaze: 0, crouch: 0,                   // Night 22: watching / stalking a low gull
+    lunge: 0, pounceArmed: true,          // Night 23: a transient spring at a close bird
   };
   function drawCat(t, dt, c) {
     // Does it notice the visitor's carried light? (the Night-15 lamplighter pattern)
@@ -904,6 +907,33 @@
     cat.gaze   += (wantGaze   - cat.gaze)   * Math.min(1, dt * 0.005);
     cat.crouch += (wantCrouch - cat.crouch) * Math.min(1, dt * 0.006);
     const gaze = cat.gaze, crouch = cat.crouch;
+
+    // ---- Night 23: the cat POUNCES. Watching (Night 22) was one-sided — the cat
+    // stalked and the gull never knew. Now when a low bird skims in VERY close, the
+    // cat SPRINGS at it: a quick lunge toward the bird that eases straight back to
+    // rest. The lunge is a transient DRAW offset, not a move — `cat.x` and the
+    // patrol are untouched, so there's no return-to-rest snap to manage (the spit
+    // doesn't shift; only the drawn body springs out and settles). And when the
+    // bird comes right past its nose (within `pounceReach`), the pounce SPOOKS it —
+    // the same Night-6 startle a click fires — so the gull bolts off the water and
+    // up to the flock (its skim cancels: a startle beats a dive). The cat finally
+    // TOUCHES the flock from the ground — Night 14 inverted: the lamplighter spooks
+    // ROOSTING birds from beside them; the cat spooks a LOW-SKIMMING one from below.
+    // Armed once per close pass (mirrors `spookArmed`) so a long glide can't pin it,
+    // and the visitor still wins — a hovering cursor (att) suppresses the pounce.
+    if (watchG && watchScore > CAT.pounceAt && att < 0.4 && cat.pounceArmed) {
+      cat.lunge = 1;                                    // spring — eases back below
+      cat.pounceArmed = false;
+      const dx = watchG.x - cat.x, dy = watchG.y - CAT.y, d = Math.hypot(dx, dy) || 1;
+      if (d < CAT.pounceReach) {                        // right past its nose — really spook it
+        watchG.startle = Math.max(watchG.startle, 1400);
+        watchG.scatterX += (dx / d) * 60;              // shoved away from the cat…
+        watchG.scatterY += (dy / d) * 40 - 40;        // …and up off the water
+      }
+    } else if (!watchG || watchScore < CAT.pounceAt * 0.6) {
+      cat.pounceArmed = true;                           // re-arm once the bird's gone
+    }
+    cat.lunge -= cat.lunge * Math.min(1, dt * 0.006);  // ease the spring back to rest
 
     // Wander: walk to a target, sit a while, pick another — unless it's watching
     // YOU or fixated on a low gull (either one freezes the stroll).
@@ -941,8 +971,10 @@
     const tailLift = (1 - moving) * 3.5 + att * 5 + gaze * 2 - crouch * 7;
 
     ctx.save();
-    ctx.translate(cat.x, CAT.y - bob + crouch * 2.5);            // body sinks into a crouch
-    ctx.scale(f, 1);                                             // flip to face its heading
+    // Night 23: the pounce springs the drawn body toward the bird (forward + down
+    // toward the waterline) and stretches it a touch, then eases back as `lunge`→0.
+    ctx.translate(cat.x + f * cat.lunge * 7, CAT.y - bob + crouch * 2.5 + cat.lunge * 4);
+    ctx.scale(f * (1 + cat.lunge * 0.14), 1);                    // flip to face its heading; stretch on the spring
 
     // Tail — the unmistakable cat signal: a curving stroke that sways and lifts,
     // and LASHES fast and low when the cat has locked onto prey (Night 22).

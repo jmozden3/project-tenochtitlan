@@ -54,14 +54,15 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>cat pounces</b> &mdash; the stalk finally has a payoff. When a gull
-    <b>skims the water close by</b>, the crouching cat <b>springs at it</b>; and if the bird crosses
-    right past its nose, the pounce <b>spooks the gull off the water</b> &mdash; it bolts up to the
-    flock, skim abandoned. The cat at last <b>touches the flock</b> from the ground.
-    <i>Watch by day, when the flock is up and skimming &mdash; keep the cursor away and let the cat hunt.</i>
+    <b>Last night:</b> a <b>sea fog</b> rolls in. The harbor's first real weather &mdash; a bank of
+    <b>haar drifts in off the headland</b> now and then, softens the town to silhouettes, and every
+    light <b>blooms through the mist</b>, the lighthouse beam glowing volumetric where it cuts the
+    fog. Unlike the lamplighter or the fisherman it's <b>tied to no hour</b> &mdash; it can swallow
+    the harbor at noon or midnight alike, so <i>any</i> visit might catch it.
+    <i>Linger and watch a bank roll in, thicken, and clear.</i>
   </p>
 
-  <footer>Night 23 &middot; founded 2026-06-02</footer>
+  <footer>Night 24 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -1029,6 +1030,81 @@
     ctx.restore();
   }
 
+  // ---- Night 24: SEA FOG (a haar). The harbor's first true WEATHER — the first
+  // thing that changes the WHOLE scene's visibility rather than adding one more
+  // object — and, deliberately, the first ambient event NOT gated to an hour. For
+  // a dozen nights the journal has muttered that everything intimate is hour-locked
+  // (the lamplighter at dusk, the fisherman by day, the lanternfall at nightfall)
+  // so a visitor catches only a thin slice; the cat (Night 21) answered that with
+  // an always-present life, and the fog answers it again at SCENE scale: a bank of
+  // mist that rolls in off the headland now and then, at ANY hour, softens the town
+  // to silhouettes, and lets every light BLOOM through it — most of all the
+  // lighthouse beam, which (drawn just after the fog) glows volumetric in the haar.
+  // It catches the hour like the smoke and ripples: cool blue-grey by night, dusty
+  // warm at dusk, pale by day. Pure function of t — a deterministic tide with a
+  // clean rise-and-fall hump — so there's no integrator and nothing to accumulate;
+  // stability is the boats'/smoke's calm, not the flock's.
+  const FOG = {
+    period: 116000,   // ms between fog banks (decoupled from DAY_MS, so it drifts the hours)
+    frac:   0.26,     // share of each period the harbor is misted (clear most of the time)
+    offset: 0.05,     // phase at load: a bank just rolling in, so tonight's delta shows on open
+    veil:   0.30,     // peak opacity of the distance wash
+    bank:   0.20,     // peak opacity of a drifting bank
+  };
+  // 0 most of the time; a smooth 0→1→0 hump while a bank passes.
+  function fogLevel(t) {
+    const cp = (((t + FOG.offset * FOG.period) % FOG.period) + FOG.period) % FOG.period / FOG.period;
+    if (cp >= FOG.frac) return 0;
+    return Math.sin((cp / FOG.frac) * Math.PI);
+  }
+  function drawFog(t, c) {
+    const fog = fogLevel(t);
+    if (fog < 0.01) return;
+    const base = lerpC([150,165,188], [198,206,214], c.daylight);   // night→day
+    const tone = lerpC(base, [216,184,154], c.dusk * 0.55);         // warm at dusk
+    const ts = `${tone[0]|0},${tone[1]|0},${tone[2]|0}`;
+    const hz = town.horizon;
+
+    ctx.save();
+    // 1) Distance wash — thickest at the waterline, thinning up into the sky and
+    //    down toward the near shore, so the far harbor recedes into the air.
+    const veil = ctx.createLinearGradient(0, hz - 150, 0, H);
+    veil.addColorStop(0.00, `rgba(${ts},0)`);
+    veil.addColorStop(0.45, `rgba(${ts},${(FOG.veil * fog * 0.7).toFixed(3)})`);
+    veil.addColorStop(0.62, `rgba(${ts},${(FOG.veil * fog).toFixed(3)})`);
+    veil.addColorStop(1.00, `rgba(${ts},${(FOG.veil * fog * 0.45).toFixed(3)})`);
+    ctx.fillStyle = veil;
+    ctx.fillRect(0, hz - 150, W, H - (hz - 150));
+
+    // 2) Drifting banks — soft low blobs scrolling at parallax speeds so the fog
+    //    has body and motion, not a flat wash. Each is a radial gradient squashed
+    //    into a band by a vertical scale (gradient + rect both in the local frame).
+    const banks = [
+      { y: hz - 8,  r: 190, h: 24, sp: 0.010, a: 1.00 },
+      { y: hz + 18, r: 165, h: 30, sp: 0.017, a: 0.90 },
+      { y: hz + 54, r: 185, h: 38, sp: 0.026, a: 0.78 },
+    ];
+    const N = 4;
+    for (const b of banks) {
+      const range = W + b.r * 2;
+      for (let i = 0; i < N; i++) {
+        const cx = -b.r + (((t * b.sp) + i * (range / N)) % range);
+        const cy = b.y + Math.sin(t * 0.0004 + i * 1.3) * 5;
+        const a  = FOG.bank * fog * b.a;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(1, b.h / b.r);                 // flatten the disc into a low band
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r);
+        g.addColorStop(0, `rgba(${ts},${a.toFixed(3)})`);
+        g.addColorStop(1, `rgba(${ts},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(-b.r, -b.r, b.r * 2, b.r * 2);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawBoats(list, t, c) {
     const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
@@ -1625,7 +1701,8 @@
     drawFisher(t, dt, c);                  // Night 18 — a daytime soul casting from the spit
     drawCat(t, dt, c);                     // Night 21 — the always-present cat prowling the spit
     drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
-    drawLighthouse(town.lighthouse, t, c);
+    drawFog(t, c);                         // Night 24 — a haar rolls through; lights bloom past it
+    drawLighthouse(town.lighthouse, t, c); // beam drawn AFTER fog ⇒ glows volumetric in the mist
     stepGulls(t, dt, c);
     drawGulls(t, c);
     drawPointer();

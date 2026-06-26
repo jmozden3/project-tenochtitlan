@@ -54,15 +54,15 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> a <b>sea fog</b> rolls in. The harbor's first real weather &mdash; a bank of
-    <b>haar drifts in off the headland</b> now and then, softens the town to silhouettes, and every
-    light <b>blooms through the mist</b>, the lighthouse beam glowing volumetric where it cuts the
-    fog. Unlike the lamplighter or the fisherman it's <b>tied to no hour</b> &mdash; it can swallow
-    the harbor at noon or midnight alike, so <i>any</i> visit might catch it.
-    <i>Linger and watch a bank roll in, thicken, and clear.</i>
+    <b>Last night:</b> the town's lights now <b>bloom through the fog</b>. Last night the haar
+    rolled in but buried every light except the beam; tonight each <b>lit window, doorway and
+    carried lantern</b> scatters a soft halo in the mist &mdash; the thicker the bank, the wider
+    each glow &mdash; so when a fog rolls through, the harbor becomes a <b>scatter of warm lanterns
+    you find before you find the town</b>. Lanternfall, earning its name in the haar.
+    <i>Wait for a bank to roll in and watch the lights swell.</i>
   </p>
 
-  <footer>Night 24 &middot; founded 2026-06-02</footer>
+  <footer>Night 25 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -476,6 +476,9 @@
           ctx.fillStyle = halo;
           ctx.fillRect(hx - 16, hy - 16, 32, 32);
 
+          // Night 25: publish the lit pane so it blooms OUT of any fog (drawFogBloom).
+          bloom(hx, hy, 22, 0.55 * flick, "255,205,138");
+
           // Wavering reflection cast down onto the water.
           const wob = Math.sin(t * 0.0016 + win.seed) * 2;
           const rg = ctx.createLinearGradient(0, town.horizon, 0, town.horizon + 46);
@@ -509,6 +512,7 @@
           sg.addColorStop(1, "rgba(255,198,120,0)");
           ctx.fillStyle = sg;
           ctx.fillRect(d.cx - ow - 2, b.baseY, ow * 2 + 4, 20);
+          bloom(d.cx, dy + d.h / 2, 18, 0.4 * open, "255,198,120");  // Night 25: the doorway glows through fog
         }
       }
     }
@@ -632,6 +636,9 @@
     glow.addColorStop(1, "rgba(255,206,128,0)");
     ctx.fillStyle = glow;
     ctx.fillRect(lampX - glowR, lampY - glowR, glowR * 2, glowR * 2);
+    // Night 25: the carried lantern blooms through fog (scaled by presence so it
+    // fades with the figure as he steps through his door).
+    bloom(lampX, lampY, glowR + 4, 0.5 * nl * presence, "255,206,128");
 
     // Its reflection straight down on the water just below (world-vertical, like the
     // boat lantern and the lit windows).
@@ -668,7 +675,7 @@
     ctx.moveTo(fx + 1, fy - 11 - bob);
     ctx.lineTo(lampX, lampY + 2);
     ctx.stroke();
-    ctx.fillStyle = `rgba(255,233,184,${0.9 * nl})`; // bright lantern core
+    ctx.fillStyle = `rgba(255,233,184,${Math.min(1, 0.9 * nl)})`; // bright lantern core (clamp: nl is att-boosted)
     ctx.beginPath();
     ctx.arc(lampX, lampY, 1.8, 0, Math.PI * 2);
     ctx.fill();
@@ -1105,6 +1112,43 @@
     ctx.restore();
   }
 
+  // ---- Night 25: the lights BLOOM through the haar. Night 24 rolled fog over the
+  // harbor but drew it ON TOP of every light except the lighthouse beam — so the
+  // windows and the carried lanterns DIMMED into the mist instead of glowing OUT of
+  // it (the beam was the one thing that bloomed, because it draws after the fog). A
+  // real fog scatters lamplight into a soft halo — the thicker the air, the wider and
+  // softer each light reads — so tonight every warm light in the town PUBLISHES itself
+  // to `bloomLights` as it draws (the Night-14 published-position trick), and this
+  // pass — run AFTER the fog, like the beam — lays an ADDITIVE halo at each, scaled by
+  // fogLevel(t). No fog ⇒ nothing pushed, nothing drawn (the clear scene is byte-for-
+  // byte untouched); thick fog ⇒ the harbor becomes a scatter of glowing lanterns you
+  // find before you find the town. Lanternfall, at last, earns its name in the mist:
+  // a place you find by its lights when you can't quite see it. Pure draw pass, no
+  // state, no integrator — the boats'/smoke's calm.
+  const bloomLights = [];
+  let fogNow = 0;
+  // Publish a warm light for the fog-bloom pass — but only while a bank is actually
+  // out, so clear weather (74% of the clock) allocates nothing.
+  function bloom(x, y, r, str, col) {
+    if (fogNow > 0.02 && str > 0.01) bloomLights.push({ x, y, r, str, col });
+  }
+  function drawFogBloom() {
+    if (fogNow < 0.02 || bloomLights.length === 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";   // light ADDS through the mist, like the beam
+    for (const L of bloomLights) {
+      const a = Math.min(0.6, L.str * fogNow);   // brightest at peak fog; capped so it never blows out
+      if (a < 0.004) continue;
+      const r = L.r * (1 + fogNow * 1.1);        // the halo swells as the air thickens
+      const g = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, r);
+      g.addColorStop(0, `rgba(${L.col},${a.toFixed(3)})`);
+      g.addColorStop(1, `rgba(${L.col},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(L.x - r, L.y - r, r * 2, r * 2);
+    }
+    ctx.restore();
+  }
+
   function drawBoats(list, t, c) {
     const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
@@ -1198,6 +1242,11 @@
 
       ctx.restore();        // end the hull transform
       ctx.restore();        // end the haze veil
+
+      // Night 25: the bow lantern blooms through fog. World coords of the local
+      // (24,-13) lantern point; the far boat blooms fainter (its haze veil) and
+      // smaller (its `near` scale), so it stays honestly distant in the mist.
+      bloom(x + 24 * s, y - 13 * s, 14 + 8 * near, 0.55 * nl * haze, "255,212,132");
     }
   }
 
@@ -1690,6 +1739,8 @@
     lastT = t;
     const c = clock(t);
     ctx.clearRect(0, 0, W, H);
+    bloomLights.length = 0;                // Night 25: refill each frame as lights draw
+    fogNow = fogLevel(t);                  // gate the bloom (and its allocations) on the haar
     drawSky(c);
     drawSea(t, c);
     drawRipples(t, c);
@@ -1701,7 +1752,8 @@
     drawFisher(t, dt, c);                  // Night 18 — a daytime soul casting from the spit
     drawCat(t, dt, c);                     // Night 21 — the always-present cat prowling the spit
     drawBoats(town.nearBoats, t, c);       // near lane — passes in front of the town
-    drawFog(t, c);                         // Night 24 — a haar rolls through; lights bloom past it
+    drawFog(t, c);                         // Night 24 — a haar rolls through
+    drawFogBloom();                        // Night 25 — the town's lights bloom OUT of the haar
     drawLighthouse(town.lighthouse, t, c); // beam drawn AFTER fog ⇒ glows volumetric in the mist
     stepGulls(t, dt, c);
     drawGulls(t, c);

@@ -54,15 +54,15 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the town's lights now <b>bloom through the fog</b>. Last night the haar
-    rolled in but buried every light except the beam; tonight each <b>lit window, doorway and
-    carried lantern</b> scatters a soft halo in the mist &mdash; the thicker the bank, the wider
-    each glow &mdash; so when a fog rolls through, the harbor becomes a <b>scatter of warm lanterns
-    you find before you find the town</b>. Lanternfall, earning its name in the haar.
-    <i>Wait for a bank to roll in and watch the lights swell.</i>
+    <b>Last night:</b> the <b>flock now hunkers in the fog</b>. For two nights the haar only
+    changed how the harbor <i>looked</i>; tonight it changes how the harbor <i>behaves</i>. When
+    a thick bank rolls in, the wheeling gulls <b>sink low over the rooftops and quiet</b> &mdash;
+    their sea-skims and their begging at the fisherman still while the murk sits &mdash; then they
+    <b>lift and wheel again</b> as the bank thins. The town's newest weather finally moves its
+    oldest creatures. <i>Watch the flock drop as the next bank rolls in.</i>
   </p>
 
-  <footer>Night 25 &middot; founded 2026-06-02</footer>
+  <footer>Night 26 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -1658,6 +1658,18 @@
     }
 
     // Pass 2: ease velocity toward desired, clamp, integrate, blend perch↔air.
+    // ---- Night 26: the flock HUNKERS in the haar. The fog has changed the town's
+    // LOOK since Night 24, and its LIGHTS since Night 25 — but never its behaviour.
+    // Tonight the newest system finally reaches the oldest: when a thick bank rolls
+    // in, every gull's want-to-fly sinks, so the wheeling flock drops low over the
+    // rooftops and quiets — and because `air` falls below the 0.85 gate the skim and
+    // the beg both need, the harbor's errands STILL while the murk sits, then resume
+    // as the bank thins. No new force, no integrator: it's just the clock's `dayFly`
+    // want scaled by the fog and eased into `air` exactly as the day/night roosting
+    // already is, so the structural-stability guarantee is untouched (worst case: a
+    // bird sitting low). And it's a DAYTIME gift for free — at night `dayFly`≈0
+    // already, so the multiply is a no-op and a midnight fog changes nothing.
+    const hunker = 1 - fogNow * 0.75;                  // thick haar ⇒ want sinks toward ~0.25
     const k = Math.min(1, FLOCK.turn * dts);
     for (const g of gulls) {
       g.vx += (g.dvx - g.vx) * k;
@@ -1667,7 +1679,8 @@
       g.fx += g.vx * dts; g.fy += g.vy * dts;
 
       // Want-to-fly from the clock (plus any lingering startle), eased into `air`.
-      let want = dayFly;
+      // The haar drags it down — a foggy flock hangs low rather than wheeling high.
+      let want = dayFly * hunker;
       if (g.startle > 0) { want = 1; g.startle -= dt; }
       g.air += (want - g.air) * Math.min(1, dt * 0.0016);
       // Scatter decays back to nothing.

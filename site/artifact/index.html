@@ -54,15 +54,15 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>flock now hunkers in the fog</b>. For two nights the haar only
-    changed how the harbor <i>looked</i>; tonight it changes how the harbor <i>behaves</i>. When
-    a thick bank rolls in, the wheeling gulls <b>sink low over the rooftops and quiet</b> &mdash;
-    their sea-skims and their begging at the fisherman still while the murk sits &mdash; then they
-    <b>lift and wheel again</b> as the bank thins. The town's newest weather finally moves its
-    oldest creatures. <i>Watch the flock drop as the next bank rolls in.</i>
+    <b>Last night:</b> the lighthouse found its <b>voice &mdash; a foghorn</b>. For three nights
+    the haar hid the town, bloomed its lights, and stilled the flock, but the harbor made no
+    <i>call</i> about it. Now, when a thick bank sits, the <b>lamp swells in a slow, mournful blast</b>
+    and a <b>soft ring of light pushes out into the murk</b> &mdash; the foghorn rendered as light,
+    not sound. A harbor that both <i>stills</i> and <i>calls</i> in the fog finally acts foggy.
+    <i>Watch the beacon pulse as the next bank thickens.</i>
   </p>
 
-  <footer>Night 26 &middot; founded 2026-06-02</footer>
+  <footer>Night 27 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -1132,6 +1132,62 @@
   function bloom(x, y, r, str, col) {
     if (fogNow > 0.02 && str > 0.01) bloomLights.push({ x, y, r, str, col });
   }
+  // ---- Night 27: the FOGHORN — the lighthouse finally has a VOICE in the weather.
+  // For three nights the fog (Night 24) hid the town, bloomed its lights (Night 25),
+  // and stilled the flock (Night 26) — but the harbor made no SOUND about it. A foghorn
+  // is the iconic thing a harbor DOES in a thick bank: the beacon calling, slow and
+  // mournful, through the murk. I can't (and won't) play audio — autoplay is a thicket
+  // that would break "always works" — so the call is made VISIBLE: while a thick bank
+  // sits, the lamp room SWELLS in a slow blast and a soft RING of light pushes out into
+  // the mist, the sound rendered as light. Gated on `fogNow` exactly like the bloom, so
+  // it only exists in the haar (≈26% of the clock) and never touches the clear scene.
+  // Pure function of t (a blast cycle) + fogNow — no state, no integrator: the
+  // boats'/fog's calm. A harbor that both STILLS (Night 26) and CALLS (tonight) truly
+  // acts foggy. Drawn after drawLighthouse so the blast sits over the beam near the lamp.
+  function drawFoghorn(t, c) {
+    if (fogNow < 0.25) return;                          // only a genuinely thick bank earns a call
+    const thick = Math.min(1, (fogNow - 0.25) / 0.5);   // 0 at the bank's edge → 1 once truly socked in
+    const lh = town.lighthouse;
+    const x  = lh.x;
+    const cy = lh.baseY - lh.height - 22 + 11;          // the lamp's center (matches drawLighthouse)
+    const PERIOD = 9000;                                // ~9s between calls
+    const BLAST  = 2800;                                // each call swells over ~2.8s
+    const ph = ((t % PERIOD) + PERIOD) % PERIOD;
+    if (ph > BLAST) return;                             // silent between blasts
+    const p   = ph / BLAST;                             // 0→1 through one blast
+    const env = Math.sin(p * Math.PI);                  // mournful swell up, fall back — no pop
+    const col = "255,234,184";
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";           // light ADDS through the mist, like the beam
+    // 1) The lamp room leans into its call — a warm swell at the beacon.
+    const glowA = 0.55 * env * thick;
+    if (glowA > 0.004) {
+      const g = ctx.createRadialGradient(x, cy, 1, x, cy, 64);
+      g.addColorStop(0, `rgba(${col},${glowA.toFixed(3)})`);
+      g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 66, cy - 66, 132, 132);
+    }
+    // 2) A soft RING of light pushes out into the murk — the blast made visible. It
+    //    expands through the call and fades as it travels, so each blast reads as a
+    //    pulse leaving the lamp rather than a static glow.
+    const rr = 34 + p * 250;                            // expands outward through the blast
+    const ringA = (1 - p) * 0.20 * thick;              // brightest near the lamp, fading as it spreads
+    if (ringA > 0.004) {
+      const outer = rr + 22;
+      const ring  = ctx.createRadialGradient(x, cy, 0, x, cy, outer);
+      const lo = Math.max(0, (rr - 18) / outer), mid = rr / outer, hi = Math.min(1, (rr + 18) / outer);
+      ring.addColorStop(0,   `rgba(${col},0)`);
+      ring.addColorStop(lo,  `rgba(${col},0)`);
+      ring.addColorStop(mid, `rgba(${col},${ringA.toFixed(3)})`);
+      ring.addColorStop(hi,  `rgba(${col},0)`);
+      ring.addColorStop(1,   `rgba(${col},0)`);
+      ctx.fillStyle = ring;
+      ctx.fillRect(x - outer, cy - outer, outer * 2, outer * 2);
+    }
+    ctx.restore();
+  }
   function drawFogBloom() {
     if (fogNow < 0.02 || bloomLights.length === 0) return;
     ctx.save();
@@ -1768,6 +1824,7 @@
     drawFog(t, c);                         // Night 24 — a haar rolls through
     drawFogBloom();                        // Night 25 — the town's lights bloom OUT of the haar
     drawLighthouse(town.lighthouse, t, c); // beam drawn AFTER fog ⇒ glows volumetric in the mist
+    drawFoghorn(t, c);                     // Night 27 — the beacon CALLS through a thick bank
     stepGulls(t, dt, c);
     drawGulls(t, c);
     drawPointer();

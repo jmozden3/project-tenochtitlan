@@ -54,15 +54,16 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the lighthouse found its <b>voice &mdash; a foghorn</b>. For three nights
-    the haar hid the town, bloomed its lights, and stilled the flock, but the harbor made no
-    <i>call</i> about it. Now, when a thick bank sits, the <b>lamp swells in a slow, mournful blast</b>
-    and a <b>soft ring of light pushes out into the murk</b> &mdash; the foghorn rendered as light,
-    not sound. A harbor that both <i>stills</i> and <i>calls</i> in the fog finally acts foggy.
-    <i>Watch the beacon pulse as the next bank thickens.</i>
+    <b>Last night:</b> the fog learned to <b>hush the water</b>. For four nights the haar hid the
+    town, bloomed its lights, stilled the flock, and gave the lighthouse a voice &mdash; but the
+    <i>surface</i> still rippled and sparked at full strength under a thick bank. Now, as the murk
+    thickens, the <b>ripples fade and the splash-glints are smothered</b> &mdash; <b>deepest far out
+    at the waterline, gentler near the shore</b>, so far rings drown while a touch at your feet only
+    softens. Surface, sky, and beacon all answer the same bank at last.
+    <i>Tap the water as the next bank rolls in &mdash; watch your rings go quiet.</i>
   </p>
 
-  <footer>Night 27 &middot; founded 2026-06-02</footer>
+  <footer>Night 28 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -1132,6 +1133,25 @@
   function bloom(x, y, r, str, col) {
     if (fogNow > 0.02 && str > 0.01) bloomLights.push({ x, y, r, str, col });
   }
+  // ---- Night 28: the fog MUFFLES the water. For four nights the haar hid the
+  // town (Night 24), bloomed its lights (Night 25), stilled the flock (Night 26),
+  // and gave the lighthouse a voice (Night 27) — but the SURFACE still rippled and
+  // sparked at full strength under a thick bank, the one part of the harbor the
+  // weather never touched. The fog veil IS drawn over the rings, yet it's a mere
+  // 30%-opacity wash: a bright ripple punches straight through it, and a glint
+  // (additive, drawn BEFORE the fog) is barely dimmed at all. So tonight the water
+  // is hushed AT THE SOURCE — each ring and spark fades by how much haar sits over
+  // it. The muffle is depth-honest, mirroring the veil's own shape: strongest far
+  // out at the waterline (where the wash is densest), gentler on the near shore, so
+  // far rings drown into the murk while a touch right at your feet only softens. Now
+  // the surface, the sky AND the beacon all answer the same bank. Clear weather
+  // (fogNow 0) ⇒ factor exactly 1.0, so the clear scene stays byte-identical.
+  function fogMute(y) {
+    if (fogNow < 0.02) return 1;                       // no bank out ⇒ no change at all
+    const d = Math.min(1, Math.max(0, (y - town.horizon) / (H - town.horizon)));
+    const over = 1 - 0.55 * d;                         // 1.0 far (waterline) → 0.45 near shore
+    return 1 - fogNow * 0.85 * over;                   // peak fog: ~0.15 far .. ~0.62 near
+  }
   // ---- Night 27: the FOGHORN — the lighthouse finally has a VOICE in the weather.
   // For three nights the fog (Night 24) hid the town, bloomed its lights (Night 25),
   // and stilled the flock (Night 26) — but the harbor made no SOUND about it. A foghorn
@@ -1423,7 +1443,7 @@
       const maxR = lerp(34, 150, depth) * rp.s;      // nearer water = bigger rings
       const rx = maxR * Math.sqrt(p);                // fast open, then ease out
       const ry = rx * 0.30;                          // foreshortened on the water
-      const a = (1 - p) * 0.5 * rp.s;
+      const a = (1 - p) * 0.5 * rp.s * fogMute(rp.y);   // Night 28: hushed under a thick bank
       // How warm is the water *here*? The dusk sky warms every ring; nearness to
       // the lighthouse's glow warms it further (and only really at night).
       const ddx = rp.x - lhx, ddy = rp.y - lhy;
@@ -1459,7 +1479,7 @@
       const age = t - gl.t0;
       if (age > LIFE) { glints.splice(i, 1); continue; }
       const p = age / LIFE;                          // 0 fresh .. 1 spent
-      const a = Math.min(1, p * 8) * (1 - p) * 0.6;  // quick ramp in, then fade — no pop
+      const a = Math.min(1, p * 8) * (1 - p) * 0.6 * fogMute(gl.y);  // quick ramp, fade — no pop; smothered in fog (Night 28)
       const r = 3 + p * 9;                           // a small spark that swells as it dies
       const g = ctx.createRadialGradient(gl.x, gl.y, 0, gl.x, gl.y, r);
       g.addColorStop(0, `rgba(${cs},${a})`);

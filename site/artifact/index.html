@@ -54,16 +54,16 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the fog learned to <b>hush the water</b>. For four nights the haar hid the
-    town, bloomed its lights, stilled the flock, and gave the lighthouse a voice &mdash; but the
-    <i>surface</i> still rippled and sparked at full strength under a thick bank. Now, as the murk
-    thickens, the <b>ripples fade and the splash-glints are smothered</b> &mdash; <b>deepest far out
-    at the waterline, gentler near the shore</b>, so far rings drown while a touch at your feet only
-    softens. Surface, sky, and beacon all answer the same bank at last.
-    <i>Tap the water as the next bank rolls in &mdash; watch your rings go quiet.</i>
+    <b>Last night:</b> the <b>lamplighter feels the weather</b> &mdash; the first <i>person</i> to
+    register the haar. For five nights the fog touched the water, sky, lights and beacon, but the
+    townsfolk walked through it unmoved. Now, when a thick bank closes in, he <b>slows his pace,
+    holds his lantern a beat higher, and turns up the flame</b> &mdash; leaning into the murk,
+    pushing more light into it. It rides the same fog the rest of the harbor answers, overlaid on
+    his walk so he never loses step with the lit row.
+    <i>Catch him at dusk or dawn as a bank rolls in &mdash; watch him lift his lamp into the fog.</i>
   </p>
 
-  <footer>Night 28 &middot; founded 2026-06-02</footer>
+  <footer>Night 29 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -613,6 +613,17 @@
     }
     lamplighter.attend += (prox - lamplighter.attend) * Math.min(1, dt * 0.006);
     const att = lamplighter.attend;
+
+    // ---- Night 29: the lamplighter FEELS THE WEATHER — the first PERSON to register
+    // the haar. For five nights the fog (Night 24) was a thing of the water, sky, light
+    // and beacon; the people walked through it unmoved. Now, when a genuine bank closes
+    // in, he SLOWS, holds his lantern a beat HIGHER, and turns up the flame — pushing
+    // more light into the murk, the way a person leans into bad weather. This is OVERLAID
+    // on the walk exactly like the Night-15 greeting: a factor off `fogNow` (the module
+    // var set in frame() before this draws) that nudges his gait/lantern/glow — it NEVER
+    // touches the pure-clock x-mapping, so he stays in lockstep with the lit row. Gated
+    // like the foghorn so only a thick bank moves him, and 0 in clear air ⇒ no change.
+    const haze = Math.max(0, Math.min(1, (fogNow - 0.25) / 0.5));
     if (att < 0.02) lamplighter.heldX = fxClock;     // track the clock until it's noticed
     const fx = lerp(fxClock, lamplighter.heldX, att);// hold the walk while greeting
     const dirToP = pointer.inside ? (Math.sign(pointer.x - fx) || 1) : 1;
@@ -620,18 +631,18 @@
 
     // Gait advances with DISTANCE walked (never moonwalks), and only while moving —
     // parked at either end of the band, or paused to greet the visitor, it just stands.
-    const moving = ss(0.03, 0.12, u) * (1 - ss(0.88, 0.99, u)) * (1 - att);
+    const moving = ss(0.03, 0.12, u) * (1 - ss(0.88, 0.99, u)) * (1 - att) * (1 - haze * 0.5); // drags in a thick bank
     const stride = Math.sin(fx * 0.20) * moving;
     const bob = Math.abs(Math.sin(fx * 0.20)) * 1.4 * moving;
-    const nl = (0.35 + 0.65 * c.nightness) * (1 + 0.45 * att); // lantern lifts brighter in greeting
+    const nl = (0.35 + 0.65 * c.nightness) * (1 + 0.45 * att) * (1 + 0.35 * haze); // wick turned up against the murk
 
     ctx.save();
     ctx.globalAlpha = presence;
 
     // The carried lantern — a warm point on a pole, held aloft and slightly ahead.
     // While greeting it lifts higher and reaches toward the visitor's own glow.
-    const lampX = fx + 7 + att * 9 * dirToP, lampY = fy - 17 - bob - att * 7;
-    const glowR = 30 + 12 * att;
+    const lampX = fx + 7 + att * 9 * dirToP, lampY = fy - 17 - bob - att * 7 - haze * 6; // held higher in the haar
+    const glowR = 30 + 12 * att + haze * 12;  // the flame's halo diffuses wider in the murk
     const glow = ctx.createRadialGradient(lampX, lampY, 0, lampX, lampY, glowR);
     glow.addColorStop(0, `rgba(255,206,128,${Math.min(0.95, 0.55 * nl)})`);
     glow.addColorStop(1, "rgba(255,206,128,0)");

@@ -54,16 +54,16 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>lamplighter feels the weather</b> &mdash; the first <i>person</i> to
-    register the haar. For five nights the fog touched the water, sky, lights and beacon, but the
-    townsfolk walked through it unmoved. Now, when a thick bank closes in, he <b>slows his pace,
-    holds his lantern a beat higher, and turns up the flame</b> &mdash; leaning into the murk,
-    pushing more light into it. It rides the same fog the rest of the harbor answers, overlaid on
-    his walk so he never loses step with the lit row.
-    <i>Catch him at dusk or dawn as a bank rolls in &mdash; watch him lift his lamp into the fog.</i>
+    <b>Last night:</b> the <b>lantern release</b> &mdash; the town finally enacts its own name. For
+    twenty-nine nights "the lanternfall" meant the cottage windows lighting one by one at dusk;
+    tonight the shore does the thing out loud. As the last windows bloom and the lamplighter reaches
+    his door, a drift of <b>paper sky-lanterns lifts off the waterline</b>, sways up on the wind,
+    glimmers on the water as it leaves it, and fades into the deepening night &mdash; a festival that
+    returns every dusk, and blooms through the fog for free.
+    <i>Watch at dusk (the page opens there) &mdash; the lanterns go up as the town lights its windows.</i>
   </p>
 
-  <footer>Night 29 &middot; founded 2026-06-02</footer>
+  <footer>Night 30 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -1236,6 +1236,96 @@
     ctx.restore();
   }
 
+  // ---- Night 30: the LANTERN RELEASE — the town finally enacts its own name. For
+  // twenty-nine nights "the lanternfall" has meant the cottage windows lighting one
+  // by one at dusk (Night 2/4) — a lovely metaphor, but the town called Lanternfall
+  // had never once released a lantern. Tonight it does the thing out loud: as the
+  // last windows bloom and the lamplighter reaches his door (Night 16), the shore
+  // SENDS UP a drift of paper sky-lanterns — small warm flames that lift off the
+  // waterline, sway upward on the same wind the smoke leans on (Night 11), cast a
+  // brief reflection on the water as they leave it, and fade into the deepening
+  // night. It's a per-cycle FESTIVAL, not a perpetual loop: every lantern is a PURE
+  // FUNCTION of the clock's `cycle` (a staggered launch fraction + a rise), so there
+  // is no integrator and nothing to accumulate — the boats'/smoke's calm, not the
+  // flock's — and it repeats each dusk for free, exactly like the lanternfall it
+  // completes. Gated to the dusk→night window: outside it every lantern's progress
+  // falls out of [0,1] and the loop `continue`s before touching the canvas, so the
+  // ~74% of the clock with no release is byte-identical. And each lantern blooms
+  // through fog for free via the shared bloom() helper (Night 25).
+  const LANTERNS = {
+    rise:       300,     // px a lantern climbs over its life
+    launch0:    0.740,   // cycle fraction the first lantern lifts off (deep dusk)
+    launchSpan: 0.050,   // staggered lift-offs spread across this slice of the cycle
+    life:       0.150,   // fraction of a cycle each lantern takes to rise + fade (~18s)
+  };
+  const skyLanterns = [];
+  (() => {
+    const N = 16;
+    for (let i = 0; i < N; i++) {
+      const rnd = k => { const v = Math.sin(i * 34.17 + k * 71.13) * 6151.73; return v - Math.floor(v); };
+      skyLanterns.push({
+        srcX:  W * (0.07 + rnd(1) * 0.55),                       // released along the shore/harbor
+        lf:    LANTERNS.launch0 + rnd(2) * LANTERNS.launchSpan,  // staggered lift-off
+        drift: (rnd(3) - 0.35) * 40,                             // a gentle horizontal wander
+        sway:  rnd(4) * 6.283,                                   // its own sway phase
+        size:  3.2 + rnd(5) * 2.2,                               // small paper lanterns, varied
+        rise:  LANTERNS.rise * (0.82 + rnd(6) * 0.5),            // some climb higher than others
+        hue:   rnd(7),                                           // a touch of warm-color variety
+      });
+    }
+  })();
+  function drawLanterns(t, c) {
+    // A slow shared wind matching the smoke's lean, so the two agree in the air.
+    const wind = Math.sin(t * 0.00012) * 0.5 + Math.sin(t * 0.00041) * 0.16;
+    const hz = town.horizon;
+    for (const L of skyLanterns) {
+      const p = (c.cycle - L.lf) / LANTERNS.life;      // 0 at lift-off .. 1 spent
+      if (p <= 0 || p >= 1) continue;                  // dormant outside its own rise
+      const rise = p * L.rise;
+      const x = L.srcX + wind * rise * 0.6 + Math.sin(p * 3.0 + L.sway) * 6 + L.drift * p;
+      const y = hz - rise;                             // lifts off the waterline into the sky
+      // Fade in fast at lift-off, hold through the climb, then recede into the night.
+      const fade = ss(0, 0.09, p) * (1 - ss(0.72, 1, p));
+      if (fade < 0.01) continue;
+      const flick = 0.85 + Math.sin(t * 0.006 + L.sway * 3) * 0.15;   // a live flame
+      const warm = lerpC([255,196,120], [255,168,96], L.hue);
+      const cs = `${warm[0]|0},${warm[1]|0},${warm[2]|0}`;
+      const a = fade * flick;
+
+      // Reflection straight down on the water while it's still near the surface,
+      // shortening and fading as it climbs away (the world-vertical trick again).
+      const reflS = Math.max(0, 1 - rise / 130) * fade;
+      if (reflS > 0.01) {
+        const rg = ctx.createLinearGradient(0, hz, 0, hz + 50);
+        rg.addColorStop(0, `rgba(${cs},${(0.22 * reflS).toFixed(3)})`);
+        rg.addColorStop(1, `rgba(${cs},0)`);
+        ctx.fillStyle = rg;
+        ctx.fillRect(x - 3, hz, 6, 50);
+      }
+
+      // Soft halo.
+      const R = 10 + L.size * 2.4;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, R);
+      glow.addColorStop(0, `rgba(${cs},${(0.5 * a).toFixed(3)})`);
+      glow.addColorStop(1, `rgba(${cs},0)`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - R, y - R, R * 2, R * 2);
+
+      // The paper body — a small warm teardrop with a brighter core.
+      ctx.fillStyle = `rgba(${cs},${Math.min(1, 0.9 * a).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(x, y, L.size * 0.8, L.size, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,240,205,${Math.min(1, a).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y + L.size * 0.15, L.size * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bloom through the haar for free (Night 25 helper — publishes to drawFogBloom).
+      bloom(x, y, R + 3, 0.5 * a, cs);
+    }
+  }
+
   function drawBoats(list, t, c) {
     const nl = 0.4 + 0.6 * c.nightness;   // lantern brightens after dark
     const wl = 0.35 + 0.65 * c.nightness; // its reflection, likewise
@@ -1848,6 +1938,7 @@
     drawBoats(town.farBoats, t, c);        // far lane — sits BEHIND the cottages
     drawBuildings(town.buildings, t, c);
     drawSmoke(town.buildings, t, c);       // Night 11 — plumes rise from lit hearths
+    drawLanterns(t, c);                    // Night 30 — the dusk lantern release rises over the harbor
     drawLamplighter(t, dt, c);             // Night 13/15 — walks the shore; pauses to greet the visitor
     drawFisher(t, dt, c);                  // Night 18 — a daytime soul casting from the spit
     drawCat(t, dt, c);                     // Night 21 — the always-present cat prowling the spit

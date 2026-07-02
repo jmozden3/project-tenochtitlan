@@ -54,16 +54,16 @@
   </div>
 
   <p class="delta" id="delta">
-    <b>Last night:</b> the <b>lantern release</b> &mdash; the town finally enacts its own name. For
-    twenty-nine nights "the lanternfall" meant the cottage windows lighting one by one at dusk;
-    tonight the shore does the thing out loud. As the last windows bloom and the lamplighter reaches
-    his door, a drift of <b>paper sky-lanterns lifts off the waterline</b>, sways up on the wind,
-    glimmers on the water as it leaves it, and fades into the deepening night &mdash; a festival that
-    returns every dusk, and blooms through the fog for free.
-    <i>Watch at dusk (the page opens there) &mdash; the lanterns go up as the town lights its windows.</i>
+    <b>Last night:</b> the festival is <b>yours to join</b>. Last night the shore sent up its own
+    sky-lanterns at dusk (Night 30), but you could only watch. Now, once dusk has fallen,
+    <b>click the shore or the water to release your own lantern</b> &mdash; it lifts off from where
+    you touched, sways up on the same wind, glimmers on the water as it leaves it, and fades into the
+    night just like the town's. Send up as many as you like; they bloom through the fog for free.
+    <i>Watch at dusk (the page opens there), then click low in the scene once the sky darkens &mdash;
+    a daytime tap only ripples the water.</i>
   </p>
 
-  <footer>Night 30 &middot; founded 2026-06-02</footer>
+  <footer>Night 31 &middot; founded 2026-06-02</footer>
 
 <script>
 (() => {
@@ -230,6 +230,9 @@
   const ripples = [];                          // {x, y, t0, s}  s = strength
   const glints = [];                           // Night 17: {x, y, t0} — splash sparks
   const pointer = { x: 0, y: 0, inside: false, lsx: -999, lsy: -999 };
+  let lastNightness = 0;                        // Night 31: last frame's clock nightness, so
+                                               // pointerdown can tell whether it's dark enough to
+                                               // release a lantern (set in frame()).
 
   // Map a pointer event into the canvas's fixed 1280×720 space (CSS scales it).
   function toScene(e) {
@@ -264,6 +267,11 @@
     const p = toScene(e);
     pointer.x = p.x; pointer.y = p.y; pointer.inside = true;   // the carried light is here now,
     spawnRipple(p.x, p.y, 1); startleGulls(p.x, p.y);          // so the click's own ring catches it
+    // Night 31: JOIN THE FESTIVAL. Once dusk has fallen, a click low in the scene
+    // (on the shore/harbor) sends up YOUR OWN sky-lantern from that spot — the
+    // ambient release (Night 30) made interactive. Gated on darkness so a daytime
+    // tap only ripples the water; the lantern lifts from the waterline like the rest.
+    if (lastNightness > 0.30 && p.y > town.horizon - 50) releaseLantern(p.x);
   });
   canvas.addEventListener("pointerleave", () => { pointer.inside = false; });
   canvas.addEventListener("pointermove", e => {
@@ -1274,55 +1282,93 @@
       });
     }
   })();
+  // ---- Night 31: the release is YOURS. The Night-30 festival was ambient — you
+  // watched it. Now, once dusk has fallen, a click on the shore/harbor sends up
+  // your OWN sky-lantern from that spot. They live in `userLanterns[]` — a transient
+  // decay system exactly like the ripples/glints (a birth time, an age→progress, a
+  // cap, culled when spent), so stability stays the boats' calm, not the flock's.
+  // Ambient and user lanterns share ONE renderer, `paintLantern`, so they're visually
+  // identical — the only difference is where `p` (0→1 life) comes from: the ambient
+  // ones read the clock's `cycle`, yours read wall-clock age since the click.
+  const userLanterns = [];                       // {srcX, t0, size, hue, drift, sway, rise}
+  const ULANTERN = { lifeMs: 16000, rise: 320 }; // ~16s to rise + fade; a touch higher than ambient
+  function releaseLantern(x) {
+    if (userLanterns.length >= 28) userLanterns.shift();   // cap like ripples — oldest drops
+    userLanterns.push({
+      srcX:  x,
+      t0:    performance.now(),
+      size:  3.4 + Math.random() * 2.4,
+      hue:   Math.random(),
+      drift: (Math.random() - 0.4) * 46,
+      sway:  Math.random() * 6.283,
+      rise:  ULANTERN.rise * (0.85 + Math.random() * 0.45),
+    });
+  }
+
+  // Render one lantern at life-progress `p` (0 at lift-off .. 1 spent). Pure draw,
+  // no state — shared by the ambient release and the visitor's own lanterns.
+  function paintLantern(t, L, p, wind, hz) {
+    const rise = p * L.rise;
+    const x = L.srcX + wind * rise * 0.6 + Math.sin(p * 3.0 + L.sway) * 6 + L.drift * p;
+    const y = hz - rise;                             // lifts off the waterline into the sky
+    // Fade in fast at lift-off, hold through the climb, then recede into the night.
+    const fade = ss(0, 0.09, p) * (1 - ss(0.72, 1, p));
+    if (fade < 0.01) return;
+    const flick = 0.85 + Math.sin(t * 0.006 + L.sway * 3) * 0.15;   // a live flame
+    const warm = lerpC([255,196,120], [255,168,96], L.hue);
+    const cs = `${warm[0]|0},${warm[1]|0},${warm[2]|0}`;
+    const a = fade * flick;
+
+    // Reflection straight down on the water while it's still near the surface,
+    // shortening and fading as it climbs away (the world-vertical trick again).
+    const reflS = Math.max(0, 1 - rise / 130) * fade;
+    if (reflS > 0.01) {
+      const rg = ctx.createLinearGradient(0, hz, 0, hz + 50);
+      rg.addColorStop(0, `rgba(${cs},${(0.22 * reflS).toFixed(3)})`);
+      rg.addColorStop(1, `rgba(${cs},0)`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(x - 3, hz, 6, 50);
+    }
+
+    // Soft halo.
+    const R = 10 + L.size * 2.4;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, R);
+    glow.addColorStop(0, `rgba(${cs},${(0.5 * a).toFixed(3)})`);
+    glow.addColorStop(1, `rgba(${cs},0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - R, y - R, R * 2, R * 2);
+
+    // The paper body — a small warm teardrop with a brighter core.
+    ctx.fillStyle = `rgba(${cs},${Math.min(1, 0.9 * a).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, L.size * 0.8, L.size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,240,205,${Math.min(1, a).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(x, y + L.size * 0.15, L.size * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bloom through the haar for free (Night 25 helper — publishes to drawFogBloom).
+    bloom(x, y, R + 3, 0.5 * a, cs);
+  }
+
   function drawLanterns(t, c) {
     // A slow shared wind matching the smoke's lean, so the two agree in the air.
     const wind = Math.sin(t * 0.00012) * 0.5 + Math.sin(t * 0.00041) * 0.16;
     const hz = town.horizon;
+    // The ambient per-cycle release (Night 30).
     for (const L of skyLanterns) {
       const p = (c.cycle - L.lf) / LANTERNS.life;      // 0 at lift-off .. 1 spent
       if (p <= 0 || p >= 1) continue;                  // dormant outside its own rise
-      const rise = p * L.rise;
-      const x = L.srcX + wind * rise * 0.6 + Math.sin(p * 3.0 + L.sway) * 6 + L.drift * p;
-      const y = hz - rise;                             // lifts off the waterline into the sky
-      // Fade in fast at lift-off, hold through the climb, then recede into the night.
-      const fade = ss(0, 0.09, p) * (1 - ss(0.72, 1, p));
-      if (fade < 0.01) continue;
-      const flick = 0.85 + Math.sin(t * 0.006 + L.sway * 3) * 0.15;   // a live flame
-      const warm = lerpC([255,196,120], [255,168,96], L.hue);
-      const cs = `${warm[0]|0},${warm[1]|0},${warm[2]|0}`;
-      const a = fade * flick;
-
-      // Reflection straight down on the water while it's still near the surface,
-      // shortening and fading as it climbs away (the world-vertical trick again).
-      const reflS = Math.max(0, 1 - rise / 130) * fade;
-      if (reflS > 0.01) {
-        const rg = ctx.createLinearGradient(0, hz, 0, hz + 50);
-        rg.addColorStop(0, `rgba(${cs},${(0.22 * reflS).toFixed(3)})`);
-        rg.addColorStop(1, `rgba(${cs},0)`);
-        ctx.fillStyle = rg;
-        ctx.fillRect(x - 3, hz, 6, 50);
-      }
-
-      // Soft halo.
-      const R = 10 + L.size * 2.4;
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, R);
-      glow.addColorStop(0, `rgba(${cs},${(0.5 * a).toFixed(3)})`);
-      glow.addColorStop(1, `rgba(${cs},0)`);
-      ctx.fillStyle = glow;
-      ctx.fillRect(x - R, y - R, R * 2, R * 2);
-
-      // The paper body — a small warm teardrop with a brighter core.
-      ctx.fillStyle = `rgba(${cs},${Math.min(1, 0.9 * a).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.ellipse(x, y, L.size * 0.8, L.size, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = `rgba(255,240,205,${Math.min(1, a).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(x, y + L.size * 0.15, L.size * 0.42, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Bloom through the haar for free (Night 25 helper — publishes to drawFogBloom).
-      bloom(x, y, R + 3, 0.5 * a, cs);
+      paintLantern(t, L, p, wind, hz);
+    }
+    // The visitor's own released lanterns (Night 31), each on its own wall-clock life.
+    const now = performance.now();
+    for (let i = userLanterns.length - 1; i >= 0; i--) {
+      const L = userLanterns[i];
+      const p = (now - L.t0) / ULANTERN.lifeMs;
+      if (p >= 1) { userLanterns.splice(i, 1); continue; }   // spent — cull
+      paintLantern(t, L, p, wind, hz);
     }
   }
 
@@ -1928,6 +1974,7 @@
     const dt = lastT ? Math.min(60, t - lastT) : 16;   // clamped per-frame delta
     lastT = t;
     const c = clock(t);
+    lastNightness = c.nightness;           // Night 31: so a click knows if it's dark enough to launch
     ctx.clearRect(0, 0, W, H);
     bloomLights.length = 0;                // Night 25: refill each frame as lights draw
     fogNow = fogLevel(t);                  // gate the bloom (and its allocations) on the haar
